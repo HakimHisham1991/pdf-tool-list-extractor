@@ -14,6 +14,7 @@
     <button id="importBtn" type="button" class="btn btn-secondary">Import Files</button>
     <button id="startBtn" type="button" class="btn" disabled>Extract Tooling Data</button>
     <button id="clearAllBtn" type="button" class="btn btn-secondary">Clear All</button>
+    <span id="elapsedWrap" class="hidden ml-2 text-sm text-gray-400">Elapsed: <span id="elapsedTimer" class="extract-timer">00:00:00</span></span>
 </div>
 <div id="importSummary" class="text-sm text-gray-400 mb-2 hidden"></div>
 <ul id="importedList" class="text-xs font-mono mb-4 max-h-48 overflow-y-auto border border-gray-700 rounded p-3 hidden list-none space-y-1"></ul>
@@ -21,7 +22,21 @@
     <div id="progress" class="bg-[#00D4FF] h-3 rounded transition-all duration-300" style="width:0%"></div>
 </div>
 <div id="banners" class="mb-4"></div>
-<div id="log" class="log font-mono text-xs"></div>
+
+<div class="extract-layout">
+  <div>
+    <div id="log" class="log font-mono text-xs"></div>
+  </div>
+  <aside class="pdf-viz-panel" aria-label="PDF extraction preview">
+    <div class="text-xs text-[#00D4FF] mb-1 font-semibold">Live PDF preview</div>
+    <div id="vizStage" class="pdf-viz-stage">Import files and start extraction to see progress here.</div>
+    <div id="vizViewport" class="pdf-viz-viewport">
+      <div id="vizPlaceholder" class="pdf-viz-placeholder">Page preview appears during OCR and table extraction.</div>
+      <img id="vizImage" alt="PDF page preview" class="hidden" />
+      <div id="vizOverlay" class="pdf-viz-overlay hidden"></div>
+    </div>
+  </aside>
+</div>
 
 @section Scripts {
 <script>
@@ -35,12 +50,65 @@
   const progressEl = document.getElementById('progress');
   const importSummary = document.getElementById('importSummary');
   const importedList = document.getElementById('importedList');
+  const elapsedWrap = document.getElementById('elapsedWrap');
+  const elapsedTimer = document.getElementById('elapsedTimer');
+  const vizStage = document.getElementById('vizStage');
+  const vizImage = document.getElementById('vizImage');
+  const vizOverlay = document.getElementById('vizOverlay');
+  const vizPlaceholder = document.getElementById('vizPlaceholder');
+
   let pollTimer = null;
+  let vizTimer = null;
+  let elapsedTimerId = null;
+  let extractStartedAt = null;
+  let highlightCycleId = null;
+  let activeHighlightIdx = 0;
+  let currentJobId = null;
   let importFolderPath = '';
   let importedRelativePaths = [];
 
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+
+  function formatElapsed(ms) {
+    var s = Math.floor(ms / 1000);
+    var h = Math.floor(s / 3600);
+    s -= h * 3600;
+    var m = Math.floor(s / 60);
+    s -= m * 60;
+    return pad2(h) + ':' + pad2(m) + ':' + pad2(s);
+  }
+
+  function startElapsedClock() {
+    extractStartedAt = Date.now();
+    elapsedWrap.classList.remove('hidden');
+    elapsedTimer.textContent = '00:00:00';
+    if (elapsedTimerId) clearInterval(elapsedTimerId);
+    elapsedTimerId = setInterval(function () {
+      if (!extractStartedAt) return;
+      elapsedTimer.textContent = formatElapsed(Date.now() - extractStartedAt);
+    }, 250);
+  }
+
+  function stopElapsedClock() {
+    if (elapsedTimerId) {
+      clearInterval(elapsedTimerId);
+      elapsedTimerId = null;
+    }
+    if (extractStartedAt) {
+      elapsedTimer.textContent = formatElapsed(Date.now() - extractStartedAt);
+      extractStartedAt = null;
+    }
+  }
+
+  function stopHighlightCycle() {
+    if (highlightCycleId) {
+      clearInterval(highlightCycleId);
+      highlightCycleId = null;
+    }
+  }
+
   function appendLog(line, cls) {
-    const el = document.createElement('div');
+    var el = document.createElement('div');
     if (cls) el.className = cls;
     el.textContent = line;
     logEl.appendChild(el);
@@ -70,6 +138,81 @@
     importBtn.textContent = busy ? 'Uploading…' : 'Import Files';
   }
 
+  function resetVisualizer() {
+    stopHighlightCycle();
+    vizStage.textContent = 'Import files and start extraction to see progress here.';
+    vizImage.classList.add('hidden');
+    vizImage.removeAttribute('src');
+    vizOverlay.classList.add('hidden');
+    vizOverlay.innerHTML = '';
+    vizPlaceholder.classList.remove('hidden');
+  }
+
+  function renderHighlights(snap) {
+    vizOverlay.innerHTML = '';
+    var list = snap.highlights || [];
+    if (list.length === 0) {
+      vizOverlay.classList.add('hidden');
+      return;
+    }
+    vizOverlay.classList.remove('hidden');
+    for (var i = 0; i < list.length; i++) {
+      var h = list[i];
+      var box = document.createElement('div');
+      box.className = 'pdf-viz-highlight kind-' + (h.kind || 'ocr');
+      if (i === activeHighlightIdx) box.classList.add('active');
+      box.style.left = (h.x * 100) + '%';
+      box.style.top = (h.y * 100) + '%';
+      box.style.width = (h.w * 100) + '%';
+      box.style.height = (h.h * 100) + '%';
+      box.title = h.label || '';
+      vizOverlay.appendChild(box);
+    }
+  }
+
+  function startHighlightCycle(count) {
+    stopHighlightCycle();
+    if (count <= 1) return;
+    highlightCycleId = setInterval(function () {
+      activeHighlightIdx = (activeHighlightIdx + 1) % count;
+      var boxes = vizOverlay.querySelectorAll('.pdf-viz-highlight');
+      for (var j = 0; j < boxes.length; j++) {
+        boxes[j].classList.toggle('active', j === activeHighlightIdx);
+      }
+    }, 450);
+  }
+
+  async function pollVisualizer(jobId) {
+    try {
+      var res = await fetch('/api/extraction/' + jobId + '/visualizer');
+      if (!res.ok) return;
+      var snap = await res.json();
+      if (!snap || !snap.fileName) return;
+
+      var pageInfo = snap.pageCount > 0
+        ? ' — page ' + (snap.pageIndex + 1) + '/' + snap.pageCount
+        : '';
+      vizStage.textContent = (snap.fileName || '') + pageInfo + '\n' + (snap.message || snap.stage || '');
+
+      var pageNum = (snap.pageIndex || 0) + 1;
+      var previewUrl = '/api/extraction/' + jobId + '/visualizer/preview?page=' + pageNum + '&_=' + Date.now();
+      vizImage.onload = function () {
+        vizPlaceholder.classList.add('hidden');
+        vizImage.classList.remove('hidden');
+      };
+      vizImage.src = previewUrl;
+
+      var highlights = snap.highlights || [];
+      if (snap.activeHighlightIndex >= 0)
+        activeHighlightIdx = snap.activeHighlightIndex;
+      renderHighlights(snap);
+      if (highlights.length > 1 && !highlightCycleId)
+        startHighlightCycle(highlights.length);
+      else if (highlights.length <= 1)
+        stopHighlightCycle();
+    } catch (e) { /* ignore poll errors */ }
+  }
+
   function renderImportedList(files) {
     importedRelativePaths = files.map(function (f) { return f.relativePath; });
     importSummary.textContent = importedRelativePaths.length + ' PDF file(s) ready (not processed yet).';
@@ -85,7 +228,7 @@
   }
 
   function statusLabel(status) {
-    const names = ['Pending', 'Running', 'Completed', 'Failed'];
+    var names = ['Pending', 'Running', 'Completed', 'Failed'];
     if (typeof status === 'string') return status;
     return names[status] ?? String(status);
   }
@@ -95,7 +238,7 @@
   }
 
   async function pollStatus(jobId) {
-    const res = await fetch('/api/extraction/status/' + jobId);
+    var res = await fetch('/api/extraction/status/' + jobId);
     if (!res.ok) {
       appendLog('Could not read job status (HTTP ' + res.status + ')', 'text-red-400');
       return null;
@@ -103,20 +246,24 @@
     return await res.json();
   }
 
+  function stopPolling() {
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+    if (vizTimer) { clearInterval(vizTimer); vizTimer = null; }
+    stopHighlightCycle();
+    stopElapsedClock();
+    currentJobId = null;
+  }
+
   clearAllBtn.addEventListener('click', async function () {
     if (!confirm('Clear all extracted data, uploads, and import list? This starts a new session.'))
       return;
 
-    if (pollTimer) {
-      clearInterval(pollTimer);
-      pollTimer = null;
-    }
-
+    stopPolling();
     clearAllBtn.disabled = true;
     appendLog('Clearing database and logs…');
 
     try {
-      const res = await fetch('/api/data/reset', { method: 'POST' });
+      var res = await fetch('/api/data/reset', { method: 'POST' });
       if (!res.ok) {
         appendLog('Clear All failed (HTTP ' + res.status + ').', 'text-red-400');
         return;
@@ -128,6 +275,8 @@
       banners.innerHTML = '';
       progressEl.style.width = '0%';
       clearImportUi(true);
+      resetVisualizer();
+      elapsedWrap.classList.add('hidden');
       appendLog('All data cleared. Import files to begin a new session.', 'text-[#00D4FF]');
     } catch (err) {
       appendLog('Clear All error: ' + err.message, 'text-red-400');
@@ -146,12 +295,12 @@
     if (selected.length === 0)
       return;
 
-    if (pollTimer) clearInterval(pollTimer);
-    pollTimer = null;
+    stopPolling();
     banners.innerHTML = '';
     progressEl.style.width = '0%';
     clearImportUi(false);
     logEl.innerHTML = '';
+    resetVisualizer();
 
     setBusy(true);
     appendLog('Uploading ' + selected.length + ' PDF file(s)…');
@@ -163,12 +312,12 @@
 
     try {
       await window.waitForDataReset();
-      const res = await fetch('/api/files/import', {
+      var res = await fetch('/api/files/import', {
         method: 'POST',
         body: formData
       });
 
-      let body = {};
+      var body = {};
       try { body = await res.json(); } catch { /* non-json */ }
 
       if (!res.ok) {
@@ -177,7 +326,7 @@
       }
 
       importFolderPath = body.folderPath || '';
-      const files = body.files || [];
+      var files = body.files || [];
       if (files.length === 0) {
         appendLog('No PDF files were imported.', 'text-yellow-400');
         return;
@@ -199,15 +348,18 @@
       return;
     }
 
-    if (pollTimer) clearInterval(pollTimer);
+    stopPolling();
     banners.innerHTML = '';
     progressEl.style.width = '0%';
+    resetVisualizer();
+    activeHighlightIdx = 0;
 
     setBusy(true);
+    startElapsedClock();
     appendLog('Starting extraction for ' + importedRelativePaths.length + ' imported PDF(s) (replacing any existing rows)…');
 
     try {
-      const res = await fetch('/api/extraction/start', {
+      var res = await fetch('/api/extraction/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
         body: JSON.stringify({
@@ -216,39 +368,46 @@
         })
       });
 
-      let body = {};
+      var body = {};
       try { body = await res.json(); } catch { /* non-json */ }
 
       if (!res.ok) {
         appendLog(body.error || ('Request failed (HTTP ' + res.status + ')'), 'text-red-400');
         setBusy(false);
+        stopElapsedClock();
         return;
       }
 
-      const jobId = body.jobId;
+      var jobId = body.jobId;
       if (!jobId) {
         appendLog('Server did not return a job id.', 'text-red-400');
         setBusy(false);
+        stopElapsedClock();
         return;
       }
 
+      currentJobId = jobId;
       appendLog('Job #' + jobId + ' queued. Processing PDFs (OCR may take several minutes per file)…');
-      const statusDiv = document.createElement('div');
+      var statusDiv = document.createElement('div');
       statusDiv.id = 'statusLine';
       statusDiv.className = 'text-[#00D4FF] mt-2';
       logEl.appendChild(statusDiv);
 
+      vizTimer = setInterval(function () {
+        if (currentJobId) pollVisualizer(currentJobId);
+      }, 500);
+
       pollTimer = setInterval(async function () {
         try {
-          const st = await pollStatus(jobId);
+          var st = await pollStatus(jobId);
           if (!st) return;
 
-          const total = Math.max(st.totalFiles || 0, 1);
-          const done = (st.processedFiles || 0) + (st.skippedFiles || 0) + (st.failedFiles || 0);
-          const pct = st.totalFiles > 0 ? Math.min(100, Math.round((done / total) * 100)) : (st.status === 1 ? 5 : 0);
+          var total = Math.max(st.totalFiles || 0, 1);
+          var done = (st.processedFiles || 0) + (st.skippedFiles || 0) + (st.failedFiles || 0);
+          var pct = st.totalFiles > 0 ? Math.min(100, Math.round((done / total) * 100)) : (st.status === 1 ? 5 : 0);
           progressEl.style.width = pct + '%';
 
-          const statusLine = document.getElementById('statusLine');
+          var statusLine = document.getElementById('statusLine');
           if (statusLine && (st.status === 0 || st.status === 1 || st.status === 'Pending' || st.status === 'Running')) {
             statusLine.textContent = 'Status: ' + statusLabel(st.status) + ' — ' + done + '/' + st.totalFiles +
               ' files (processed ' + st.processedFiles + ', skipped ' + st.skippedFiles + ', failed ' + st.failedFiles + ')';
@@ -257,6 +416,10 @@
           if (isTerminal(st.status)) {
             clearInterval(pollTimer);
             pollTimer = null;
+            if (vizTimer) { clearInterval(vizTimer); vizTimer = null; }
+            if (currentJobId) await pollVisualizer(currentJobId);
+            stopHighlightCycle();
+            stopElapsedClock();
             progressEl.style.width = '100%';
             setBusy(false);
 
@@ -293,17 +456,18 @@
             }
           }
         } catch (err) {
-          clearInterval(pollTimer);
-          pollTimer = null;
+          stopPolling();
           setBusy(false);
           appendLog('Polling error: ' + err.message, 'text-red-400');
         }
       }, 2000);
 
       await pollStatus(jobId);
+      await pollVisualizer(jobId);
     } catch (err) {
       appendLog('Error: ' + err.message, 'text-red-400');
       setBusy(false);
+      stopElapsedClock();
     }
   });
 })();

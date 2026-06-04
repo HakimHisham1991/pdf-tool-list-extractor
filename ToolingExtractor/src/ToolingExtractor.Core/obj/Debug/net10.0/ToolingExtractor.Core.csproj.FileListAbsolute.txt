@@ -9,3 +9,4 @@ C:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\Toolin
 C:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\ToolingExtractor\src\ToolingExtractor.Core\obj\Debug\net10.0\refint\ToolingExtractor.Core.dll
 C:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\ToolingExtractor\src\ToolingExtractor.Core\obj\Debug\net10.0\ToolingExtractor.Core.pdb
 c:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\ToolingExtractor\src\ToolingExtractor.Core\obj\Debug\net10.0\ref\ToolingExtractor.Core.dll
+C:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\ToolingExtractor\src\ToolingExtractor.Core\obj\Debug\net10.0\ToolingExtractor.Core.sourcelink.json

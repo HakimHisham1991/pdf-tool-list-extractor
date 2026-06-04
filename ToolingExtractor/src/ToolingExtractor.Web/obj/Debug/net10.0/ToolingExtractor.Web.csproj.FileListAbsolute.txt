@@ -258,4 +258,5 @@ C:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\Toolin
 C:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\ToolingExtractor\src\ToolingExtractor.Web\bin\Debug\net10.0\runtimes\win-x64\native\paddle2onnx.dll
 C:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\ToolingExtractor\src\ToolingExtractor.Web\bin\Debug\net10.0\runtimes\win-x64\native\paddle_inference_c.dll
 C:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\ToolingExtractor\src\ToolingExtractor.Web\bin\Debug\net10.0\runtimes\win-x64\native\phi.dll
-C:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\ToolingExtractor\src\ToolingExtractor.Web\obj\Debug\net10.0\compressed\q58bat3uwa-{0}-jocfh0u9g7-jocfh0u9g7.gz
+C:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\ToolingExtractor\src\ToolingExtractor.Web\obj\Debug\net10.0\ToolingExtractor.Web.sourcelink.json
+C:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\ToolingExtractor\src\ToolingExtractor.Web\obj\Debug\net10.0\compressed\q58bat3uwa-{0}-1zgrgbwxei-1zgrgbwxei.gz

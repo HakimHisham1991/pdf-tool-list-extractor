@@ -20,6 +20,7 @@ public class ToolingExtractorOptions
     /// <summary>Per-PDF processing timeout (OCR on amended/scanned multi-page files can take several minutes).</summary>
     public int PerFileTimeoutSeconds { get; set; } = 600;
     public List<string> AllowedBasePaths { get; set; } = new();
+    public PythonTableExtractionOptions PythonTableExtraction { get; set; } = new();
     public AmendmentDetectionOptions AmendmentDetection { get; set; } = new();
     public ImagePreprocessingOptions ImagePreprocessing { get; set; } = new();
 }

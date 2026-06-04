@@ -4,6 +4,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using ToolingExtractor.Core;
 using ToolingExtractor.Core.Configuration;
 using ToolingExtractor.Core.Enums;
 using ToolingExtractor.Core.Interfaces;
@@ -25,10 +26,12 @@ public class ExtractionPipelineService
     private readonly ScannedPdfExtractor _scannedExtractor;
     private readonly ITemplateDetector _templateDetector;
     private readonly ParserFactory _parserFactory;
+    private readonly TemplateAParseService _templateAParse;
     private readonly OcrTextCorrector _ocrCorrector;
     private readonly ToolingRepository _repository;
     private readonly ToolingExtractorOptions _options;
     private readonly ILogger<ExtractionPipelineService> _logger;
+    private readonly IExtractionVisualizerNotifier _visualizer;
 
     public ExtractionPipelineService(
         ToolingDbContext db,
@@ -39,10 +42,12 @@ public class ExtractionPipelineService
         ScannedPdfExtractor scannedExtractor,
         ITemplateDetector templateDetector,
         ParserFactory parserFactory,
+        TemplateAParseService templateAParse,
         OcrTextCorrector ocrCorrector,
         ToolingRepository repository,
         IOptions<ToolingExtractorOptions> options,
-        ILogger<ExtractionPipelineService> logger)
+        ILogger<ExtractionPipelineService> logger,
+        IExtractionVisualizerNotifier visualizer)
     {
         _db = db;
         _folderScan = folderScan;
@@ -52,10 +57,12 @@ public class ExtractionPipelineService
         _scannedExtractor = scannedExtractor;
         _templateDetector = templateDetector;
         _parserFactory = parserFactory;
+        _templateAParse = templateAParse;
         _ocrCorrector = ocrCorrector;
         _repository = repository;
         _options = options.Value;
         _logger = logger;
+        _visualizer = visualizer;
     }
 
     /// <summary>Validates path, creates a job, and returns immediately (processing runs via <see cref="ExecuteExtractionAsync"/>).</summary>
@@ -132,7 +139,11 @@ public class ExtractionPipelineService
                 timeoutCts.CancelAfter(TimeSpan.FromSeconds(fileTimeout));
 
                 var relativePath = Path.GetRelativePath(canonicalFolder, filePath);
+                var displayName = Path.GetFileName(relativePath);
                 var hash = _hashService.ComputeSha256(filePath);
+
+                _visualizer.BeginFile(job.Id, filePath, displayName);
+                using var vizScope = ExtractionVisualizerScope.Begin(job.Id, filePath);
 
                 if (await _repository.HashExistsAsync(hash, timeoutCts.Token))
                 {
@@ -155,6 +166,8 @@ public class ExtractionPipelineService
                 if (amendmentReport?.IsAmended == true)
                     Interlocked.Increment(ref amended);
 
+                _visualizer.SetStage(job.Id, "classify", $"Classified as {pdfType}", 0, 0, 0, 0);
+
                 var text = await ExtractTextAsync(pdfType, filePath, timeoutCts.Token);
                 var template = _templateDetector.Detect(text);
                 if (template == TemplateType.Unknown)
@@ -167,8 +180,23 @@ public class ExtractionPipelineService
                     return;
                 }
 
-                var parser = _parserFactory.GetParser(template);
-                var result = parser.Parse(text, relativePath, pdfType, amendmentReport);
+                _visualizer.SetStage(job.Id, "parse", $"Parsing template {template}…", 0, 0, 0, 0);
+
+                ExtractionResult result;
+                if (template == TemplateType.TemplateA)
+                {
+                    result = await _templateAParse.ParseAsync(
+                        filePath, text, relativePath, pdfType, amendmentReport, timeoutCts.Token);
+                }
+                else
+                {
+                    var parser = _parserFactory.GetParser(template);
+                    result = parser.Parse(text, relativePath, pdfType, amendmentReport);
+                }
+
+                _visualizer.SetStage(
+                    job.Id, "done", $"Extracted {result.Records.Count} tool row(s)",
+                    0, 0, 0, 0);
 
                 foreach (var record in result.Records)
                 {
@@ -209,11 +237,13 @@ public class ExtractionPipelineService
             }
             finally
             {
+                _visualizer.EndFile(job.Id);
                 semaphore.Release();
             }
         });
 
         await Task.WhenAll(tasks);
+        _visualizer.ClearJob(job.Id);
         await progressCts.CancelAsync();
         try { await progressReporter; } catch (OperationCanceledException) { }
 

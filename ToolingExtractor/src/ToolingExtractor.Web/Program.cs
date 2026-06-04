@@ -53,11 +53,18 @@ builder.Services.AddScoped<ScannedPdfExtractor>();
 builder.Services.AddScoped<ImagePreprocessor>();
 builder.Services.AddScoped<OcrTextCorrector>();
 builder.Services.AddScoped<ITemplateDetector, TemplateDetector>();
+builder.Services.AddScoped<ParserA>();
 builder.Services.AddScoped<IToolingParser, ParserA>();
 builder.Services.AddScoped<IToolingParser, ParserB>();
 builder.Services.AddScoped<IToolingParser, ParserC>();
 builder.Services.AddScoped<ParserFactory>();
+builder.Services.AddScoped<PythonTableExtractionBridge>();
+builder.Services.AddScoped<TemplateAParseService>();
 builder.Services.AddScoped<ExtractionPipelineService>();
+builder.Services.AddSingleton<ExtractionVisualizerStore>();
+builder.Services.AddSingleton<IExtractionVisualizerNotifier>(sp =>
+    sp.GetRequiredService<ExtractionVisualizerStore>());
+builder.Services.AddSingleton<PdfPagePreviewService>();
 builder.Services.AddSingleton<ExtractionJobQueue>();
 builder.Services.AddScoped<FolderScanService>();
 builder.Services.AddScoped<PdfUploadService>();

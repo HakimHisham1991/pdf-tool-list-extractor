@@ -2,7 +2,7 @@
 
 Monorepo for **ToolingExtractor** — a .NET 10 web application that extracts aerospace CNC tooling tables from PDF work instructions and tooling lists, stores them in SQLite, and provides CSV/Excel export.
 
-**Current version: v3.3.1**
+**Current version: v3.5.0**
 
 ---
 
@@ -42,6 +42,7 @@ Open the URL shown in the terminal (e.g. `http://localhost:5261`).
 
 ```
 pdf-tool-list-extractor/
+├── python/                    # pdfplumber / camelot / tabula table extractor
 ├── ToolingExtractor/          # Main .NET solution (see ToolingExtractor/README.md)
 │   ├── src/                   # Core, Infrastructure, Application, Web
 │   ├── tests/

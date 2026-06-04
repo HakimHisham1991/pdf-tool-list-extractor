@@ -6,6 +6,7 @@ using ToolingExtractor.Core.Models;
 using ToolingExtractor.Infrastructure.Data;
 using ToolingExtractor.Infrastructure.Data.Repositories;
 using ToolingExtractor.Infrastructure.Export;
+using ToolingExtractor.Infrastructure.Pdf;
 
 namespace ToolingExtractor.Web.Api;
 
@@ -136,6 +137,33 @@ public static class ExtractionApiEndpoints
         {
             var job = await db.ExtractionJobs.AsNoTracking().FirstOrDefaultAsync(j => j.Id == jobId);
             return job == null ? Results.NotFound() : Results.Ok(job);
+        });
+
+        app.MapGet("/api/extraction/{jobId:int}/visualizer", (int jobId, ExtractionVisualizerStore store) =>
+        {
+            var snap = store.GetSnapshot(jobId);
+            return snap == null ? Results.NotFound() : Results.Ok(snap);
+        });
+
+        app.MapGet("/api/extraction/{jobId:int}/visualizer/preview", (
+            int jobId,
+            int? page,
+            ExtractionVisualizerStore store,
+            PdfPagePreviewService preview) =>
+        {
+            var path = store.GetPreviewFilePath(jobId);
+            if (string.IsNullOrEmpty(path) || !System.IO.File.Exists(path))
+                return Results.NotFound();
+
+            var snap = store.GetSnapshot(jobId);
+            var pageNum = page ?? (snap != null ? snap.PageIndex + 1 : 1);
+            if (pageNum < 1)
+                pageNum = 1;
+
+            var bytes = preview.RenderPageJpeg(path, pageNum);
+            return bytes == null || bytes.Length == 0
+                ? Results.NotFound()
+                : Results.File(bytes, "image/jpeg");
         });
 
         app.MapGet("/api/records", async (

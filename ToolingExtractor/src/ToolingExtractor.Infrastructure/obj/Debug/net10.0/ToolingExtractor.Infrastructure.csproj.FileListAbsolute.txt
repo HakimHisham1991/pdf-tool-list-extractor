@@ -61,3 +61,4 @@ C:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\Toolin
 C:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\ToolingExtractor\src\ToolingExtractor.Infrastructure\obj\Debug\net10.0\ToolingExtractor.Infrastructure.pdb
 C:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\ToolingExtractor\src\ToolingExtractor.Infrastructure\obj\Debug\net10.0\ToolingExtractor.Infrastructure.genruntimeconfig.cache
 C:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\ToolingExtractor\src\ToolingExtractor.Infrastructure\obj\Debug\net10.0\ref\ToolingExtractor.Infrastructure.dll
+C:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\ToolingExtractor\src\ToolingExtractor.Infrastructure\obj\Debug\net10.0\ToolingExtractor.Infrastructure.sourcelink.json

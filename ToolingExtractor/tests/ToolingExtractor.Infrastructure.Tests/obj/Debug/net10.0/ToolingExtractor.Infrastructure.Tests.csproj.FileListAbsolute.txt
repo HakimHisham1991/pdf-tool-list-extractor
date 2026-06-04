@@ -247,3 +247,4 @@ C:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\Toolin
 C:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\ToolingExtractor\tests\ToolingExtractor.Infrastructure.Tests\bin\Debug\net10.0\runtimes\win-x64\native\paddle2onnx.dll
 C:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\ToolingExtractor\tests\ToolingExtractor.Infrastructure.Tests\bin\Debug\net10.0\runtimes\win-x64\native\paddle_inference_c.dll
 C:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\ToolingExtractor\tests\ToolingExtractor.Infrastructure.Tests\bin\Debug\net10.0\runtimes\win-x64\native\phi.dll
+C:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\ToolingExtractor\tests\ToolingExtractor.Infrastructure.Tests\obj\Debug\net10.0\ToolingExtractor.Infrastructure.Tests.sourcelink.json

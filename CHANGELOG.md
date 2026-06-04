@@ -1,5 +1,44 @@
 # Changelog
 
+## [3.5.0] - 2026-06-04
+
+### Added
+
+- **Extraction elapsed timer** on the Extract page (`HH:MM:SS`) while a job is running.
+- **Live PDF visualizer** during extraction: page preview, stage messages, and highlighted OCR/digital regions (FineReader-style active-region cycling in the UI).
+- API: `GET /api/extraction/{jobId}/visualizer` and `GET /api/extraction/{jobId}/visualizer/preview`.
+
+## [3.4.2] - 2026-06-04
+
+### Added
+
+- **pdfplumber-wordgrid** extractor: uses PDF vertical rules + word positions for 12-column Master Tooling List tables (fixes jumbled OCR columns on landscape WI PDFs like `SAMPLE.pdf`).
+
+### Fixed
+
+- Python `is_footer_row` import error in `clean.py`.
+- C# inline WI parser stops at footer blocks (no stamp/approval text in last tool row).
+- Auto-detect `python/.venv/Scripts/python.exe` when `PythonExecutable` is default `python`.
+
+## [3.4.1] - 2026-06-04
+
+### Fixed
+
+- App startup crash: register `ParserA` in DI for `TemplateAParseService` (was only registered as `IToolingParser`).
+
+## [3.4.0] - 2026-06-04
+
+### Added
+
+- **Python table extraction** for Template A (Master Tooling List): pdfplumber → camelot → tabula pipeline with raw + cleaned DataFrame columns (`Tool_No`, `Tool_Name`, … `Remarks`).
+- `python/table_extractor/` package and .NET bridge (`PythonTableExtractionBridge`, `TemplateAParseService`).
+- Config: `ToolingExtractor:PythonTableExtraction` in appsettings.json.
+
+### Changed
+
+- Template A extraction tries Python bordered-table parsing first; falls back to PdfPig/OCR text parsing if Python is unavailable or returns too few rows.
+- Parser column aliases extended for Tool Identifier, Total Diameter/Length, Anchor Description.
+
 ## [3.3.1] - 2026-06-04
 
 ### Changed

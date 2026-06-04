@@ -61,3 +61,4 @@ C:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\Toolin
 C:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\ToolingExtractor\src\ToolingExtractor.Application\obj\Debug\net10.0\refint\ToolingExtractor.Application.dll
 C:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\ToolingExtractor\src\ToolingExtractor.Application\obj\Debug\net10.0\ToolingExtractor.Application.pdb
 C:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\ToolingExtractor\src\ToolingExtractor.Application\obj\Debug\net10.0\ref\ToolingExtractor.Application.dll
+C:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\ToolingExtractor\src\ToolingExtractor.Application\obj\Debug\net10.0\ToolingExtractor.Application.sourcelink.json

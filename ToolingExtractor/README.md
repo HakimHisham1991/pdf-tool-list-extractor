@@ -1,9 +1,10 @@
-# ToolingExtractor v3.3.1
+# ToolingExtractor v3.5.0
 
-Production-oriented **aerospace CNC tooling PDF extraction** — built in **100% C# / .NET 10**. It reads Master Tooling List / Work Instruction PDFs, extracts structured tool rows, stores them in **SQLite**, and exposes a **Razor Pages** web UI plus JSON/CSV/Excel export APIs.
+Production-oriented **aerospace CNC tooling PDF extraction** — **.NET 10** web app plus an optional **Python** bordered-table engine for Master Tooling List PDFs. It reads Work Instruction / tooling list PDFs, extracts structured tool rows, stores them in **SQLite**, and exposes a **Razor Pages** web UI plus JSON/CSV/Excel export APIs.
 
 | Capability | Technology |
 |------------|------------|
+| **Bordered tool tables (Template A)** | **pdfplumber** → **camelot** → **tabula** (Python, via subprocess) |
 | Digital / embedded text PDFs | [PdfPig](https://github.com/UglyToad/PdfPig) |
 | Scanned & amended PDFs | [PaddleSharp](https://github.com/sdcb/PaddleSharp) OCR (PP-OCRv4, MKL-DNN) |
 | Storage | SQLite + Entity Framework Core |
@@ -22,13 +23,14 @@ Production-oriented **aerospace CNC tooling PDF extraction** — built in **100%
 6. [Configuration reference](#configuration-reference)
 7. [Using the web UI](#using-the-web-ui)
 8. [Session and data lifecycle](#session-and-data-lifecycle)
-9. [How PDFs are processed](#how-pdfs-are-processed)
-10. [Tooling templates](#tooling-templates)
-11. [REST API](#rest-api)
-12. [Output folders](#output-folders)
-13. [Troubleshooting](#troubleshooting)
-14. [Development](#development)
-15. [Third-party licenses](#third-party-licenses)
+9. [Python table extraction (Template A)](#python-table-extraction-template-a)
+10. [How PDFs are processed](#how-pdfs-are-processed)
+11. [Tooling templates](#tooling-templates)
+12. [REST API](#rest-api)
+13. [Output folders](#output-folders)
+14. [Troubleshooting](#troubleshooting)
+15. [Development](#development)
+16. [Third-party licenses](#third-party-licenses)
 
 ---
 
@@ -48,6 +50,7 @@ Results are browsable in the UI, exportable per file or in bulk, and tied to a s
 
 ```
 ToolingExtractor/
+├── python/table_extractor/   # pdfplumber / camelot / tabula pipeline (see ../python/README.md)
 ├── src/
 │   ├── ToolingExtractor.Core/          # Domain models, enums, options, interfaces
 │   ├── ToolingExtractor.Infrastructure/ # EF Core, PDF/OCR, parsers, export
@@ -79,6 +82,8 @@ ToolingExtractor/
 | **AVX2 CPU** | Intel Haswell (2013+) or AMD Ryzen (2017+). Startup fails with a clear message if missing |
 | **Disk space** | ~200 MB for OCR models; additional space for uploads and SQLite |
 | **RAM** | Large landscape WI sheets use capped page rendering (`MaxPageRenderPixels`) to avoid OOM; 8 GB+ recommended for heavy OCR batches |
+| **Python 3.10+** (recommended) | For bordered Master Tooling List table extraction; falls back to text parsing if missing |
+| **Ghostscript** (optional) | Required for camelot `lattice` mode on some PDFs |
 
 Native OCR DLLs come from NuGet package `Sdcb.PaddleInference.runtime.win64.mkl`. After `dotnet restore` and `dotnet build`, native libraries are copied into the Web project output directory.
 
@@ -92,6 +97,13 @@ cd ToolingExtractor
 # 1) Restore, build, (optional) download OCR models — see next section
 dotnet restore
 dotnet build
+
+# 1b) Python table extractor (strongly recommended for Template A WI PDFs)
+cd ..\python
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r table_extractor\requirements.txt
+cd ..\ToolingExtractor
 
 # 2) Apply database schema (first run also migrates on startup)
 dotnet ef database update `
@@ -165,6 +177,10 @@ Edit **`src/ToolingExtractor.Web/appsettings.json`** → section `ToolingExtract
 | `AmendedPdfLogPath` | `./amended_pdf_log` | Amendment detection JSON logs. |
 | `AmendmentDetection` | — | Whiteout/overlap thresholds for amended PDF detection. |
 | `ImagePreprocessing` | — | Brightness/deskew settings before OCR. |
+| `PythonTableExtraction:Enabled` | `true` | Run Python pdfplumber/camelot/tabula for Template A. |
+| `PythonTableExtraction:PythonExecutable` | `python` | Python on PATH (or full path to venv python). |
+| `PythonTableExtraction:TimeoutSeconds` | `180` | Subprocess timeout per PDF. |
+| `PythonTableExtraction:MinimumToolRows` | `3` | Minimum valid `T##` rows to accept Python output. |
 
 **Logging** — `ToolingExtractor` namespace defaults to `Debug` in appsettings for detailed pipeline logs during development.
 
@@ -183,7 +199,8 @@ Summary counts: total records, digital vs scanned, amended PDFs, revision confli
 | Control | Action |
 |---------|--------|
 | **Import Files** | Opens the OS file picker. Select one or many `.pdf` files from **any** folder. Files are uploaded to the server staging area; names appear in the list below. Nothing is OCR’d yet. |
-| **Extract Tooling Data** | Enabled after a successful import. Queues a background job; progress bar and log update every 2 seconds. **Always re-extracts**: existing DB rows for the same file hash are removed and replaced. |
+| **Extract Tooling Data** | Enabled after a successful import. Queues a background job; progress bar and log update every 2 seconds. Shows an **elapsed timer** (`HH:MM:SS`) while running. **Always re-extracts**: existing DB rows for the same file hash are removed and replaced. |
+| **Live PDF preview** | Right-hand panel during extraction: current page JPEG, stage message, and highlighted OCR/digital text regions (ABBYY-style cycling highlight on active region). |
 | **Clear All** | Wipes SQLite, upload staging, `failed_extractions`, and `amended_pdf_log`. Clears the import list and log on the page. Starts a fresh session without reloading the browser. |
 
 **Import tips**
@@ -220,6 +237,57 @@ The layout calls `POST /api/data/reset` on reload/new tab. Pages that load API d
 
 ---
 
+## Python table extraction (Template A)
+
+For **Master Tooling List** PDFs with ruled borders, the app prefers a Python pipeline that preserves column alignment better than line-based OCR text.
+
+### Strategy order
+
+1. **pdfplumber-wordgrid** — reads vertical PDF rules, assigns each word to 1 of 12 columns (best for landscape Master Tooling List / `SAMPLE.pdf`)  
+2. **pdfplumber** — `vertical_strategy` / `horizontal_strategy`: `lines`, tuned tolerances for WI tables  
+3. **camelot** — `flavor='lattice'` then `stream` (install Ghostscript for lattice)  
+4. **tabula-py** — lattice/stream fallback  
+
+### Output columns (pandas → JSON)
+
+| Python column | Stored in DB as |
+|---------------|-----------------|
+| `Tool_No` | Tool No. |
+| `Tool_Name` | Tool Name |
+| `Consumable_Tool_Description` | Consumable Tool Description |
+| `Tool_Supplier` | Tool Supplier |
+| `Tool_Identifier` | Tool Holder |
+| `Total_Diameter` | Tool Diameter (D1) |
+| `Flute_Length` | Flute Length (L1) |
+| `Total_Length` | Tool Ext. Length (L2) |
+| `Total_Corner_Radius` | Tool Corner Radius |
+| `Anchor_Description` | Arbor Description |
+| `Tool_Path_Time_In_Minutes` | Tool Path Time in Minutes |
+| `Remarks` | Remarks |
+
+Each run produces **raw** and **cleaned** row sets. Cleaning includes:
+
+- Footer/stamp row removal (`CAM Programmer`, `Approved by`, …)  
+- `T##` validation (`T01`, `T02`, …)  
+- Broken decimal repair (`63 . 000` → `63.000`)  
+- Multi-line description merge for continuation rows  
+
+### Standalone test
+
+```powershell
+cd python
+.\.venv\Scripts\Activate.ps1
+python -m table_extractor --pdf "C:\Tools\PDFs\TYPE_1_F57551907200 OP10 REV01_WI.pdf"
+```
+
+### Disable Python
+
+Set `ToolingExtractor:PythonTableExtraction:Enabled` to `false` in appsettings to use only C# text/OCR parsers.
+
+Full Python docs: [../python/README.md](../python/README.md).
+
+---
+
 ## How PDFs are processed
 
 High-level pipeline (background job per **Extract** click):
@@ -232,7 +300,8 @@ Upload batch (staging folder)
         → Classify PDF (Digital / Scanned / Mixed / Amended)
         → Extract text (PdfPig and/or PaddleOCR on rendered pages)
         → Detect template A, B, or C
-        → Parse tooling header + tool rows
+        → Template A: Python table extract (pdfplumber/camelot/tabula) OR fallback text parse
+        → Templates B/C: Parse tooling header + tool rows from text
         → Optional: amendment flag, revision conflict check
     → Bulk insert ToolingRecord rows
     → Update job status (processed / skipped / failed / amended counts)
@@ -272,6 +341,8 @@ Base URL: same origin as the web app (e.g. `http://localhost:5261`).
 | `POST` | `/api/folder/import` | JSON `{ folderPath }`. Lists PDFs under an **AllowedBasePaths** folder (legacy; no upload). |
 | `POST` | `/api/extraction/start` | JSON `{ folderPath, filePaths[] }`. `folderPath` from import response; `filePaths` relative names. Always re-extracts. Returns `{ jobId }`. |
 | `GET` | `/api/extraction/status/{jobId}` | Job progress and counts. |
+| `GET` | `/api/extraction/{jobId}/visualizer` | Live snapshot: file name, stage, page index, normalized highlight rectangles (`x`,`y`,`w`,`h` 0–1). |
+| `GET` | `/api/extraction/{jobId}/visualizer/preview?page=N` | JPEG render of the current PDF page for the active file. |
 
 ### Files and records
 
@@ -322,6 +393,8 @@ All except the database file are **emptied** on reset; the database is dropped a
 | Startup: Paddle DLL missing | `dotnet restore`, rebuild Web project; verify `paddle_inference*.dll` in output folder. |
 | Startup: model error | Run `scripts/download-models.ps1`; verify `det`, `cls`, `rec` under `models/ppocr_v4`. |
 | Import does nothing after picking files | Hard-refresh (v3.3.1+). Open browser devtools → Console for JS errors. |
+| Tool columns jumbled on WI PDF | Install Python deps (`pip install -r python/table_extractor/requirements.txt`). Check logs for `Python table extraction: N rows via pdfplumber`. |
+| Python not used | Ensure `python/table_extractor` exists relative to app cwd; set `PythonExecutable` to venv python. |
 | Import HTTP 400 | Non-PDF selected, empty files, or file &gt; `MaxUploadFileBytes`. |
 | Extract: all failed | Open `failed_extractions/*.txt` — template mismatch or empty OCR. Try digital PDF sample first. |
 | Extract: timeout | Increase `PerFileTimeoutSeconds` in appsettings. |

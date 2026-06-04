@@ -14,12 +14,18 @@ internal static class ParserHelpers
         ["tool name"] = nameof(ToolingRecord.ToolName),
         ["consumable"] = nameof(ToolingRecord.ConsumableToolDescription),
         ["supplier"] = nameof(ToolingRecord.ToolSupplier),
+        ["tool identifier"] = nameof(ToolingRecord.ToolHolder),
+        ["identifier"] = nameof(ToolingRecord.ToolHolder),
         ["holder"] = nameof(ToolingRecord.ToolHolder),
+        ["total diameter"] = nameof(ToolingRecord.ToolDiameterD1),
         ["diameter"] = nameof(ToolingRecord.ToolDiameterD1),
         ["flute"] = nameof(ToolingRecord.FluteLengthL1),
+        ["total length"] = nameof(ToolingRecord.ToolExtLengthL2),
         ["ext. length"] = nameof(ToolingRecord.ToolExtLengthL2),
         ["ext length"] = nameof(ToolingRecord.ToolExtLengthL2),
+        ["total corner"] = nameof(ToolingRecord.ToolCornerRadius),
         ["corner"] = nameof(ToolingRecord.ToolCornerRadius),
+        ["anchor"] = nameof(ToolingRecord.ArborDescription),
         ["arbor"] = nameof(ToolingRecord.ArborDescription),
         ["path time"] = nameof(ToolingRecord.ToolPathTimeMinutes),
         ["remarks"] = nameof(ToolingRecord.Remarks)
@@ -167,9 +173,7 @@ internal static class ParserHelpers
     public static List<string[]> ParseInlineWiToolRows(string text, ILogger logger, string sourceFile)
     {
         var rows = new List<string[]>();
-        var footerIdx = text.IndexOf("CAM Programmer", StringComparison.OrdinalIgnoreCase);
-        if (footerIdx < 0)
-            footerIdx = text.IndexOf("Approved by", StringComparison.OrdinalIgnoreCase);
+        var footerIdx = IndexOfFooter(text);
         var body = footerIdx > 0 ? text[..footerIdx] : text;
 
         var matches = Regex.Matches(body, @"\bT\d{2}\b", RegexOptions.IgnoreCase);
@@ -184,9 +188,13 @@ internal static class ParserHelpers
             var start = matches[i].Index;
             var end = i + 1 < matches.Count ? matches[i + 1].Index : body.Length;
             var segment = body[start..end].Trim();
+            if (segment.Contains("CAM Programmer", StringComparison.OrdinalIgnoreCase) ||
+                segment.Contains("Approved by", StringComparison.OrdinalIgnoreCase) ||
+                segment.Contains("Tool Register", StringComparison.OrdinalIgnoreCase))
+                break;
 
             // Real tool rows include numeric dimensions (e.g. 63.000); skip label-only T## mentions.
-            if (!Regex.IsMatch(segment, @"\d+\.\d{2,}"))
+            if (!Regex.IsMatch(segment, @"\d+\.\d{3}"))
                 continue;
 
             var tokens = segment.Split('\t', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
@@ -266,6 +274,19 @@ internal static class ParserHelpers
 
     private static bool IsHeaderRow(string toolNo) =>
         toolNo.Contains("Tool No", StringComparison.OrdinalIgnoreCase);
+
+    private static int IndexOfFooter(string text)
+    {
+        var markers = new[] { "CAM Programmer", "Approved by", "Tool Register By", "Tool Register" };
+        var idx = -1;
+        foreach (var m in markers)
+        {
+            var i = text.IndexOf(m, StringComparison.OrdinalIgnoreCase);
+            if (i >= 0 && (idx < 0 || i < idx))
+                idx = i;
+        }
+        return idx;
+    }
 
     public static void ApplyHeader(ToolingRecord record, ToolingHeader header)
     {

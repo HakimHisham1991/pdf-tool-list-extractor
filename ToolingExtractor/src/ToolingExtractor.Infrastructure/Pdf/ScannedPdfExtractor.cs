@@ -3,8 +3,10 @@ using Microsoft.Extensions.Options;
 using OpenCvSharp;
 using Sdcb.PaddleOCR;
 using SkiaSharp;
+using ToolingExtractor.Core;
 using ToolingExtractor.Core.Configuration;
 using ToolingExtractor.Core.Interfaces;
+using ToolingExtractor.Core.Models;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.Rendering.Skia;
 
@@ -16,6 +18,7 @@ public class ScannedPdfExtractor : IPdfTextExtractor
     private readonly ImagePreprocessor _preprocessor;
     private readonly ToolingExtractorOptions _options;
     private readonly ILogger<ScannedPdfExtractor> _logger;
+    private readonly IExtractionVisualizerNotifier? _visualizer;
     private readonly SemaphoreSlim _renderSemaphore = new(2);
     public float LastMinConfidence { get; private set; } = 1f;
     public int LastPageOrientation { get; private set; }
@@ -24,12 +27,14 @@ public class ScannedPdfExtractor : IPdfTextExtractor
         PaddleOcrAll ocr,
         ImagePreprocessor preprocessor,
         IOptions<ToolingExtractorOptions> options,
-        ILogger<ScannedPdfExtractor> logger)
+        ILogger<ScannedPdfExtractor> logger,
+        IExtractionVisualizerNotifier? visualizer = null)
     {
         _ocr = ocr;
         _preprocessor = preprocessor;
         _options = options.Value;
         _logger = logger;
+        _visualizer = visualizer;
     }
 
     public async Task<string> ExtractTextAsync(string filePath, CancellationToken cancellationToken = default)
@@ -37,16 +42,27 @@ public class ScannedPdfExtractor : IPdfTextExtractor
         LastMinConfidence = 1f;
         LastPageOrientation = 0;
         var pageTexts = new List<string>();
+        var jobId = ExtractionVisualizerScope.JobId;
 
         await _renderSemaphore.WaitAsync(cancellationToken);
         try
         {
             using var doc = PdfDocument.Open(filePath);
             doc.AddSkiaPageFactory();
+            var pageCount = doc.NumberOfPages;
 
-            for (var pageNumber = 1; pageNumber <= doc.NumberOfPages; pageNumber++)
+            for (var pageNumber = 1; pageNumber <= pageCount; pageNumber++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                var pageIndex = pageNumber - 1;
+
+                if (jobId.HasValue)
+                {
+                    _visualizer?.SetStage(
+                        jobId.Value, "render", $"Rendering page {pageNumber}/{pageCount} for OCR…",
+                        pageIndex, pageCount, 0, 0);
+                }
+
                 SKBitmap? bitmap = null;
                 SKBitmap? working = null;
                 try
@@ -79,6 +95,13 @@ public class ScannedPdfExtractor : IPdfTextExtractor
                         }
                     }
 
+                    if (jobId.HasValue)
+                    {
+                        _visualizer?.SetStage(
+                            jobId.Value, "ocr", $"OCR — page {pageNumber}/{pageCount}",
+                            pageIndex, pageCount, working.Width, working.Height);
+                    }
+
                     using var mat = SkiaOpenCvHelper.ToMat(working);
                     var result = _ocr.Run(mat);
                     var filtered = result.Regions
@@ -92,6 +115,9 @@ public class ScannedPdfExtractor : IPdfTextExtractor
                         if (minConf < 0.75)
                             _logger.LogWarning("Low OCR confidence {Conf:F2} on page {Page} of {File}", minConf, pageNumber, filePath);
                     }
+
+                    if (jobId.HasValue && filtered.Count > 0)
+                        PublishOcrHighlights(jobId.Value, filtered, working.Width, working.Height, pageIndex, pageCount);
 
                     pageTexts.Add(OcrTableSorter.SortRegionsToTableText(filtered, working.Height));
                 }
@@ -113,6 +139,41 @@ public class ScannedPdfExtractor : IPdfTextExtractor
         }
 
         return string.Join("\n", pageTexts);
+    }
+
+    private void PublishOcrHighlights(
+        int jobId,
+        IReadOnlyList<PaddleOcrResultRegion> regions,
+        int imageWidth,
+        int imageHeight,
+        int pageIndex,
+        int pageCount)
+    {
+        var highlights = new List<VisualizerHighlight>();
+        var max = Math.Min(regions.Count, 100);
+        for (var i = 0; i < max; i++)
+        {
+            var r = regions[i];
+            var (x, y, w, h) = RegionBounds(r.Rect);
+            highlights.Add(VisualizerHighlightHelper.FromPixelRect(
+                x, y, w, h, imageWidth, imageHeight, r.Text, "ocr"));
+        }
+
+        _visualizer?.SetStage(
+            jobId, "ocr", $"OCR — highlighting {highlights.Count} region(s) on page {pageIndex + 1}",
+            pageIndex, pageCount, imageWidth, imageHeight, highlights, 0);
+    }
+
+    private static (double X, double Y, double W, double H) RegionBounds(RotatedRect rect)
+    {
+        var pts = rect.Points();
+        var xs = pts.Select(p => p.X).ToArray();
+        var ys = pts.Select(p => p.Y).ToArray();
+        var minX = xs.Min();
+        var maxX = xs.Max();
+        var minY = ys.Min();
+        var maxY = ys.Max();
+        return (minX, minY, maxX - minX, maxY - minY);
     }
 
     private static int GetPageRotationDegrees(UglyToad.PdfPig.Content.Page page)
