@@ -1,5 +1,35 @@
 # Changelog
 
+## [3.6.1] - 2026-06-04
+
+### Fixed
+
+- **PDF preview** now uses **PDFium** (NuGet `PDFtoImage` / `bblanchon.PDFium`) so pages render with vector text, table borders, and images — not embedded bitmaps only.
+- Tiled rendering enabled for large WI/tool-list pages that previously broke PdfPig/Skia.
+
+### Changed
+
+- SkiaSharp bumped to 3.119.2 (PDFtoImage dependency).
+
+## [3.6.0] - 2026-06-04
+
+### Added
+
+- **Import file table** on Extract: columns No., Filename, and PDF preview (eye icon).
+- **Static PDF preview panel**: click the eye icon to load a full-page preview before extraction (`GET /api/files/preview`, `GET /api/files/preview/meta`).
+- Multi-page preview navigation (‹ ›) when a PDF has more than one page.
+
+### Changed
+
+- Removed live extraction visualizer polling from the Extract UI (log + progress only during extract).
+- Preview rendering composites embedded page images when full-page Skia render fails (fixes garbled thumbnails on WI/tool-list PDFs).
+
+## [3.5.1] - 2026-06-04
+
+### Fixed
+
+- **Live PDF preview** during extraction: WI/tool-list PDFs with very large embedded scans no longer show a blank thumbnail. Preview falls back to the largest embedded page image when full-page Skia render cannot allocate a bitmap; stage metadata (page count, highlights) is preserved across Python table extraction.
+
 ## [3.5.0] - 2026-06-04
 
 ### Added

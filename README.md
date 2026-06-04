@@ -2,7 +2,7 @@
 
 Monorepo for **ToolingExtractor** — a .NET 10 web application that extracts aerospace CNC tooling tables from PDF work instructions and tooling lists, stores them in SQLite, and provides CSV/Excel export.
 
-**Current version: v3.5.0**
+**Current version: v3.6.1**
 
 ---
 

@@ -109,6 +109,69 @@ public static class ExtractionApiEndpoints
         })
         .DisableAntiforgery();
 
+        app.MapGet("/api/files/preview/meta", (
+            string folderPath,
+            string relativePath,
+            FolderScanService folderScan,
+            PdfPagePreviewService preview) =>
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(folderPath) || string.IsNullOrWhiteSpace(relativePath))
+                    return Results.BadRequest(new { error = "folderPath and relativePath are required." });
+
+                var paths = folderScan.ResolveImportedFilePaths(folderPath.Trim(), [relativePath.Trim()]);
+                if (paths.Count == 0)
+                    return Results.NotFound();
+
+                return Results.Ok(new
+                {
+                    fileName = Path.GetFileName(paths[0]),
+                    pageCount = preview.GetPageCount(paths[0])
+                });
+            }
+            catch (SecurityException ex)
+            {
+                return Results.BadRequest(new { error = ex.Message });
+            }
+            catch (FileNotFoundException ex)
+            {
+                return Results.NotFound(new { error = ex.Message });
+            }
+        });
+
+        app.MapGet("/api/files/preview", (
+            string folderPath,
+            string relativePath,
+            int? page,
+            FolderScanService folderScan,
+            PdfPagePreviewService preview) =>
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(folderPath) || string.IsNullOrWhiteSpace(relativePath))
+                    return Results.BadRequest(new { error = "folderPath and relativePath are required." });
+
+                var paths = folderScan.ResolveImportedFilePaths(folderPath.Trim(), [relativePath.Trim()]);
+                if (paths.Count == 0)
+                    return Results.NotFound();
+
+                var pageNum = Math.Max(1, page ?? 1);
+                var bytes = preview.RenderPageJpeg(paths[0], pageNum, maxEdgePixels: 1600);
+                return bytes == null || bytes.Length == 0
+                    ? Results.NotFound()
+                    : Results.File(bytes, "image/jpeg");
+            }
+            catch (SecurityException ex)
+            {
+                return Results.BadRequest(new { error = ex.Message });
+            }
+            catch (FileNotFoundException ex)
+            {
+                return Results.NotFound(new { error = ex.Message });
+            }
+        });
+
         app.MapPost("/api/folder/import", (ImportFolderRequestDto request, FolderScanService folderScan) =>
         {
             try

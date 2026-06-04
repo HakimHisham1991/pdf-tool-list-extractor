@@ -78,15 +78,18 @@ public class ExtractionVisualizerStore : IExtractionVisualizerNotifier
 
         lock (state.Lock)
         {
+            var prev = state.Snapshot;
             state.Snapshot.Stage = stage;
             state.Snapshot.Message = message;
-            state.Snapshot.PageIndex = pageIndex;
-            state.Snapshot.PageCount = pageCount;
-            state.Snapshot.ImageWidth = imageWidth;
-            state.Snapshot.ImageHeight = imageHeight;
+            state.Snapshot.PageIndex = pageIndex >= 0 ? pageIndex : prev.PageIndex;
+            state.Snapshot.PageCount = pageCount > 0 ? pageCount : prev.PageCount;
+            state.Snapshot.ImageWidth = imageWidth > 0 ? imageWidth : prev.ImageWidth;
+            state.Snapshot.ImageHeight = imageHeight > 0 ? imageHeight : prev.ImageHeight;
             state.Snapshot.ActiveHighlightIndex = activeHighlightIndex;
-            state.Snapshot.Highlights = highlights?.ToList() ?? new List<VisualizerHighlight>();
-            state.Snapshot.HasPreview = imageWidth > 0 && imageHeight > 0;
+            state.Snapshot.Highlights = highlights is { Count: > 0 }
+                ? highlights.ToList()
+                : prev.Highlights;
+            state.Snapshot.HasPreview = state.Snapshot.ImageWidth > 0 && state.Snapshot.ImageHeight > 0;
             state.Snapshot.UpdatedAtUtc = DateTime.UtcNow;
         }
     }

@@ -1,4 +1,4 @@
-# ToolingExtractor v3.5.0
+# ToolingExtractor v3.6.1
 
 Production-oriented **aerospace CNC tooling PDF extraction** — **.NET 10** web app plus an optional **Python** bordered-table engine for Master Tooling List PDFs. It reads Work Instruction / tooling list PDFs, extracts structured tool rows, stores them in **SQLite**, and exposes a **Razor Pages** web UI plus JSON/CSV/Excel export APIs.
 
@@ -9,6 +9,7 @@ Production-oriented **aerospace CNC tooling PDF extraction** — **.NET 10** web
 | Scanned & amended PDFs | [PaddleSharp](https://github.com/sdcb/PaddleSharp) OCR (PP-OCRv4, MKL-DNN) |
 | Storage | SQLite + Entity Framework Core |
 | Export | CSV, multi-sheet Excel (ClosedXML) |
+| **PDF page preview (UI)** | [PDFtoImage](https://www.nuget.org/packages/PDFtoImage/) / **PDFium** (bundled native DLLs — no separate install) |
 | UI | ASP.NET Core Razor Pages + Tailwind (CDN) |
 
 ---
@@ -198,10 +199,10 @@ Summary counts: total records, digital vs scanned, amended PDFs, revision confli
 
 | Control | Action |
 |---------|--------|
-| **Import Files** | Opens the OS file picker. Select one or many `.pdf` files from **any** folder. Files are uploaded to the server staging area; names appear in the list below. Nothing is OCR’d yet. |
-| **Extract Tooling Data** | Enabled after a successful import. Queues a background job; progress bar and log update every 2 seconds. Shows an **elapsed timer** (`HH:MM:SS`) while running. **Always re-extracts**: existing DB rows for the same file hash are removed and replaced. |
-| **Live PDF preview** | Right-hand panel during extraction: current page JPEG, stage message, and highlighted OCR/digital text regions (ABBYY-style cycling highlight on active region). |
-| **Clear All** | Wipes SQLite, upload staging, `failed_extractions`, and `amended_pdf_log`. Clears the import list and log on the page. Starts a fresh session without reloading the browser. |
+| **Import Files** | Opens the OS file picker. Uploaded PDFs appear in a table (No., Filename, **eye icon**). |
+| **Eye icon (preview)** | Loads a **full-page** JPEG in the right panel (text, borders, and graphics via PDFium). Multi-page PDFs: use ‹ › under the filename. |
+| **Extract Tooling Data** | Enabled after import. Progress bar, log, and elapsed timer (`HH:MM:SS`). **Always re-extracts** matching file hashes. |
+| **Clear All** | Wipes SQLite, upload staging, `failed_extractions`, and `amended_pdf_log`. Starts a fresh session. |
 
 **Import tips**
 
@@ -338,6 +339,8 @@ Base URL: same origin as the web app (e.g. `http://localhost:5261`).
 | Method | Path | Description |
 |--------|------|-------------|
 | `POST` | `/api/files/import` | **Multipart** form field `files` (repeatable). Uploads PDFs; returns `{ folderPath, batchId, count, files[] }`. |
+| `GET` | `/api/files/preview/meta` | Query `folderPath`, `relativePath` → `{ fileName, pageCount }`. |
+| `GET` | `/api/files/preview` | Query `folderPath`, `relativePath`, optional `page` → full-page JPEG (PDFium). |
 | `POST` | `/api/folder/import` | JSON `{ folderPath }`. Lists PDFs under an **AllowedBasePaths** folder (legacy; no upload). |
 | `POST` | `/api/extraction/start` | JSON `{ folderPath, filePaths[] }`. `folderPath` from import response; `filePaths` relative names. Always re-extracts. Returns `{ jobId }`. |
 | `GET` | `/api/extraction/status/{jobId}` | Job progress and counts. |
