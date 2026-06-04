@@ -2,6 +2,10 @@
 
 ## [3.3.1] - 2026-06-04
 
+### Changed
+
+- Expanded **ToolingExtractor/README.md** and root **README.md** (setup, UI, API, config, troubleshooting).
+
 ### Fixed
 
 - Import Files did nothing after selecting PDFs — file list was cleared before upload (silent no-op).
