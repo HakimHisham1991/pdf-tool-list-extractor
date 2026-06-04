@@ -1,0 +1,116 @@
+@page
+@model ToolingExtractor.Web.Pages.ToolListDataModel
+@{
+    ViewData["Title"] = "Tool List Data Extracted";
+}
+
+<div class="mb-4">
+    <a class="text-sm text-[#00D4FF] hover:underline" href="/FilesProcessed">&larr; Back to Files Processed</a>
+</div>
+
+<h2 class="text-2xl font-semibold mb-2 text-[#00D4FF]">Tool List Data Extracted</h2>
+<div id="fileMeta" class="text-sm text-gray-400 mb-4"></div>
+<div id="exportBar" class="flex gap-2 mb-4 hidden">
+    <a id="exportCsv" class="btn" href="#">Download CSV</a>
+    <a id="exportExcel" class="btn" href="#">Download Excel</a>
+</div>
+
+<div class="table-wrap">
+    <table class="w-full text-sm" id="toolsTable">
+        <thead>
+            <tr>
+                <th>Tool No.</th>
+                <th>Tool Name</th>
+                <th>Consumable Tool Description</th>
+                <th>Tool Supplier</th>
+                <th>Tool Holder</th>
+                <th>Tool Diameter (D1)</th>
+                <th>Flute Length (L1)</th>
+                <th>Tool Ext. Length (L2)</th>
+                <th>Tool Corner Radius</th>
+                <th>Arbor Description (or equivalent specs)</th>
+                <th>Tool Path Time in Minutes</th>
+                <th>Remarks</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+<p id="loadError" class="text-red-400 text-sm mt-4 hidden"></p>
+
+@section Scripts {
+<script>
+(function () {
+  const params = new URLSearchParams(window.location.search);
+  const hash = params.get('hash');
+  const metaEl = document.getElementById('fileMeta');
+  const exportBar = document.getElementById('exportBar');
+  const exportCsv = document.getElementById('exportCsv');
+  const exportExcel = document.getElementById('exportExcel');
+  const tbody = document.querySelector('#toolsTable tbody');
+  const errEl = document.getElementById('loadError');
+
+  function esc(s) {
+    if (s == null) return '';
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  }
+
+  if (!hash) {
+    errEl.textContent = 'Missing file reference. Open a file from Files Processed.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  async function load() {
+    await window.waitForDataReset();
+    const res = await fetch('/api/files/' + encodeURIComponent(hash));
+    if (!res.ok) {
+      errEl.textContent = 'Could not load tooling data for this file.';
+      errEl.classList.remove('hidden');
+      return;
+    }
+    const data = await res.json();
+    const s = data.summary;
+    metaEl.innerHTML =
+      '<strong class="text-gray-200">' + esc(s.sourceFile) + '</strong> &mdash; ' +
+      esc(s.toolListId) + ' | Part: ' + esc(s.partNumber) + ' | Op: ' + esc(s.operation) +
+      ' | Rev: ' + esc(s.revision) + ' | <span class="text-[#00D4FF]">' + s.toolRowCount + ' tools</span>';
+
+    const hashParam = encodeURIComponent(hash);
+    exportCsv.href = '/api/export/csv?hash=' + hashParam;
+    exportExcel.href = '/api/export/excel?hash=' + hashParam;
+    exportBar.classList.remove('hidden');
+
+    tbody.innerHTML = '';
+    const toolRows = data.tools.filter(r =>
+      r.toolNo && !(r.remarks && r.remarks.indexOf('PARSE_FAILED') >= 0));
+    for (const r of toolRows) {
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td>' + esc(r.toolNo) + '</td>' +
+        '<td>' + esc(r.toolName) + '</td>' +
+        '<td>' + esc(r.consumableToolDescription) + '</td>' +
+        '<td>' + esc(r.toolSupplier) + '</td>' +
+        '<td>' + esc(r.toolHolder) + '</td>' +
+        '<td>' + esc(r.toolDiameterD1) + '</td>' +
+        '<td>' + esc(r.fluteLengthL1) + '</td>' +
+        '<td>' + esc(r.toolExtLengthL2) + '</td>' +
+        '<td>' + esc(r.toolCornerRadius) + '</td>' +
+        '<td>' + esc(r.arborDescription) + '</td>' +
+        '<td>' + esc(r.toolPathTimeMinutes) + '</td>' +
+        '<td>' + esc(r.remarks) + '</td>';
+      tbody.appendChild(tr);
+    }
+    if (tbody.children.length === 0) {
+      const failed = data.tools.find(r => r.remarks && r.remarks.indexOf('PARSE_FAILED') >= 0);
+      errEl.textContent = failed
+        ? 'Tool table was not parsed (header only). Run Extract again for this file.'
+        : 'No tool rows stored for this file. Run Extract again for this file.';
+      errEl.classList.remove('hidden');
+    }
+  }
+
+  load();
+})();
+</script>
+}

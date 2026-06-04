@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ToolingExtractor.Application/ToolingExtractor.Application.csproj" />
+    <Project Path="src/ToolingExtractor.Core/ToolingExtractor.Core.csproj" />
+    <Project Path="src/ToolingExtractor.Infrastructure/ToolingExtractor.Infrastructure.csproj" />
+    <Project Path="src/ToolingExtractor.Web/ToolingExtractor.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ToolingExtractor.Core.Tests/ToolingExtractor.Core.Tests.csproj" />
+    <Project Path="tests/ToolingExtractor.Infrastructure.Tests/ToolingExtractor.Infrastructure.Tests.csproj" />
+  </Folder>
+</Solution>

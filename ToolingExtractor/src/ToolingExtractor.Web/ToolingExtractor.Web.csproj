@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>ToolingExtractor.Web</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Sdcb.PaddleInference.runtime.win64.mkl" Version="3.3.1.70" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ToolingExtractor.Application\ToolingExtractor.Application.csproj" />
+    <ProjectReference Include="..\ToolingExtractor.Infrastructure\ToolingExtractor.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <!-- PaddleSharp resolves DLLs from the app root; NuGet puts them under runtimes/win-x64/native -->
+  <Target Name="CopyPaddleNativeDllsToAppRoot" AfterTargets="Build">
+    <PropertyGroup>
+      <_PaddleNativeSourceDir>$(OutputPath)runtimes\win-x64\native\</_PaddleNativeSourceDir>
+    </PropertyGroup>
+    <ItemGroup>
+      <_PaddleNativeDll Include="$(_PaddleNativeSourceDir)common.dll" />
+      <_PaddleNativeDll Include="$(_PaddleNativeSourceDir)libiomp5md.dll" />
+      <_PaddleNativeDll Include="$(_PaddleNativeSourceDir)mkldnn.dll" />
+      <_PaddleNativeDll Include="$(_PaddleNativeSourceDir)mklml.dll" />
+      <_PaddleNativeDll Include="$(_PaddleNativeSourceDir)onnxruntime.dll" />
+      <_PaddleNativeDll Include="$(_PaddleNativeSourceDir)onnxruntime_providers_shared.dll" />
+      <_PaddleNativeDll Include="$(_PaddleNativeSourceDir)paddle2onnx.dll" />
+      <_PaddleNativeDll Include="$(_PaddleNativeSourceDir)paddle_inference_c.dll" />
+      <_PaddleNativeDll Include="$(_PaddleNativeSourceDir)phi.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_PaddleNativeDll)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" Condition="Exists('%(_PaddleNativeDll.Identity)')" />
+  </Target>
+
+</Project>

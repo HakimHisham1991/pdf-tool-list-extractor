@@ -1,0 +1,29 @@
+@page
+@model ToolingExtractor.Web.Pages.IndexModel
+@{
+    ViewData["Title"] = "Dashboard";
+}
+
+<h2 class="text-2xl font-semibold mb-6 text-[#00D4FF]">Dashboard</h2>
+<div class="grid grid-cols-2 md:grid-cols-3 gap-4" id="stats-grid">
+    <div class="card"><span class="label">Total Records</span><span class="value" id="total">—</span></div>
+    <div class="card"><span class="label">Digital</span><span class="value" id="digital">—</span></div>
+    <div class="card"><span class="label">Scanned</span><span class="value" id="scanned">—</span></div>
+    <div class="card warn-amber"><span class="label">Amended</span><span class="value" id="amended">—</span></div>
+    <div class="card warn-grey"><span class="label">Skipped (Dedup)</span><span class="value">—</span></div>
+    <div class="card warn-orange"><span class="label">Revision Conflicts</span><span class="value" id="conflicts">—</span></div>
+</div>
+
+@section Scripts {
+<script>
+window.waitForDataReset().then(function () {
+  return fetch('/api/dashboard');
+}).then(r => r.json()).then(d => {
+  document.getElementById('total').textContent = d.totalRecords;
+  document.getElementById('digital').textContent = d.digitalCount;
+  document.getElementById('scanned').textContent = d.scannedCount;
+  document.getElementById('amended').textContent = d.amendedCount;
+  document.getElementById('conflicts').textContent = d.revisionConflictCount;
+});
+</script>
+}

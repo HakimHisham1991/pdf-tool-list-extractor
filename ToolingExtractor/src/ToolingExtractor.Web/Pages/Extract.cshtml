@@ -1,0 +1,312 @@
+@page
+@model ToolingExtractor.Web.Pages.ExtractModel
+@{
+    ViewData["Title"] = "Extract";
+}
+
+<h2 class="text-2xl font-semibold mb-4 text-[#00D4FF]">Extract Tooling Data</h2>
+<p class="text-sm text-gray-400 mb-4">
+    Click <strong>Import Files</strong> to open the file browser and multi-select PDFs from any folder on your PC.
+    Then run <strong>Extract Tooling Data</strong> (existing rows for the same file are replaced).
+</p>
+<div class="flex gap-2 mb-4 flex-wrap items-center">
+    <input id="pdfPicker" type="file" accept=".pdf,application/pdf" multiple class="hidden" />
+    <button id="importBtn" type="button" class="btn btn-secondary">Import Files</button>
+    <button id="startBtn" type="button" class="btn" disabled>Extract Tooling Data</button>
+    <button id="clearAllBtn" type="button" class="btn btn-secondary">Clear All</button>
+</div>
+<div id="importSummary" class="text-sm text-gray-400 mb-2 hidden"></div>
+<ul id="importedList" class="text-xs font-mono mb-4 max-h-48 overflow-y-auto border border-gray-700 rounded p-3 hidden list-none space-y-1"></ul>
+<div class="w-full bg-gray-800 rounded h-3 mb-4 overflow-hidden">
+    <div id="progress" class="bg-[#00D4FF] h-3 rounded transition-all duration-300" style="width:0%"></div>
+</div>
+<div id="banners" class="mb-4"></div>
+<div id="log" class="log font-mono text-xs"></div>
+
+@section Scripts {
+<script>
+(function () {
+  const logEl = document.getElementById('log');
+  const banners = document.getElementById('banners');
+  const startBtn = document.getElementById('startBtn');
+  const importBtn = document.getElementById('importBtn');
+  const clearAllBtn = document.getElementById('clearAllBtn');
+  const pdfPicker = document.getElementById('pdfPicker');
+  const progressEl = document.getElementById('progress');
+  const importSummary = document.getElementById('importSummary');
+  const importedList = document.getElementById('importedList');
+  let pollTimer = null;
+  let importFolderPath = '';
+  let importedRelativePaths = [];
+
+  function appendLog(line, cls) {
+    const el = document.createElement('div');
+    if (cls) el.className = cls;
+    el.textContent = line;
+    logEl.appendChild(el);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function clearImportUi(clearPicker) {
+    importFolderPath = '';
+    importedRelativePaths = [];
+    importSummary.classList.add('hidden');
+    importSummary.textContent = '';
+    importedList.classList.add('hidden');
+    importedList.innerHTML = '';
+    if (clearPicker) pdfPicker.value = '';
+    setExtractEnabled(false);
+  }
+
+  function setExtractEnabled(enabled) {
+    startBtn.disabled = !enabled;
+  }
+
+  function setBusy(busy) {
+    startBtn.disabled = busy || importedRelativePaths.length === 0;
+    importBtn.disabled = busy;
+    clearAllBtn.disabled = busy;
+    startBtn.textContent = busy ? 'Extracting…' : 'Extract Tooling Data';
+    importBtn.textContent = busy ? 'Uploading…' : 'Import Files';
+  }
+
+  function renderImportedList(files) {
+    importedRelativePaths = files.map(function (f) { return f.relativePath; });
+    importSummary.textContent = importedRelativePaths.length + ' PDF file(s) ready (not processed yet).';
+    importSummary.classList.remove('hidden');
+    importedList.innerHTML = '';
+    for (var i = 0; i < files.length; i++) {
+      var li = document.createElement('li');
+      li.textContent = files[i].fileName || files[i].relativePath;
+      importedList.appendChild(li);
+    }
+    importedList.classList.toggle('hidden', files.length === 0);
+    setExtractEnabled(files.length > 0);
+  }
+
+  function statusLabel(status) {
+    const names = ['Pending', 'Running', 'Completed', 'Failed'];
+    if (typeof status === 'string') return status;
+    return names[status] ?? String(status);
+  }
+
+  function isTerminal(status) {
+    return status === 2 || status === 3 || status === 'Completed' || status === 'Failed';
+  }
+
+  async function pollStatus(jobId) {
+    const res = await fetch('/api/extraction/status/' + jobId);
+    if (!res.ok) {
+      appendLog('Could not read job status (HTTP ' + res.status + ')', 'text-red-400');
+      return null;
+    }
+    return await res.json();
+  }
+
+  clearAllBtn.addEventListener('click', async function () {
+    if (!confirm('Clear all extracted data, uploads, and import list? This starts a new session.'))
+      return;
+
+    if (pollTimer) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
+
+    clearAllBtn.disabled = true;
+    appendLog('Clearing database and logs…');
+
+    try {
+      const res = await fetch('/api/data/reset', { method: 'POST' });
+      if (!res.ok) {
+        appendLog('Clear All failed (HTTP ' + res.status + ').', 'text-red-400');
+        return;
+      }
+
+      sessionStorage.removeItem('te-session');
+      window.__dataResetPromise = null;
+      logEl.innerHTML = '';
+      banners.innerHTML = '';
+      progressEl.style.width = '0%';
+      clearImportUi(true);
+      appendLog('All data cleared. Import files to begin a new session.', 'text-[#00D4FF]');
+    } catch (err) {
+      appendLog('Clear All error: ' + err.message, 'text-red-400');
+    } finally {
+      clearAllBtn.disabled = false;
+      setBusy(false);
+    }
+  });
+
+  importBtn.addEventListener('click', function () {
+    pdfPicker.click();
+  });
+
+  pdfPicker.addEventListener('change', async function () {
+    var selected = Array.from(pdfPicker.files || []);
+    if (selected.length === 0)
+      return;
+
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = null;
+    banners.innerHTML = '';
+    progressEl.style.width = '0%';
+    clearImportUi(false);
+    logEl.innerHTML = '';
+
+    setBusy(true);
+    appendLog('Uploading ' + selected.length + ' PDF file(s)…');
+
+    var formData = new FormData();
+    for (var i = 0; i < selected.length; i++) {
+      formData.append('files', selected[i]);
+    }
+
+    try {
+      await window.waitForDataReset();
+      const res = await fetch('/api/files/import', {
+        method: 'POST',
+        body: formData
+      });
+
+      let body = {};
+      try { body = await res.json(); } catch { /* non-json */ }
+
+      if (!res.ok) {
+        appendLog(body.error || ('Import failed (HTTP ' + res.status + ')'), 'text-red-400');
+        return;
+      }
+
+      importFolderPath = body.folderPath || '';
+      const files = body.files || [];
+      if (files.length === 0) {
+        appendLog('No PDF files were imported.', 'text-yellow-400');
+        return;
+      }
+
+      renderImportedList(files);
+      appendLog('Imported ' + files.length + ' PDF(s). Click Extract Tooling Data to process.');
+    } catch (err) {
+      appendLog('Import error: ' + err.message, 'text-red-400');
+    } finally {
+      pdfPicker.value = '';
+      setBusy(false);
+    }
+  });
+
+  startBtn.addEventListener('click', async function () {
+    if (!importFolderPath || importedRelativePaths.length === 0) {
+      appendLog('Import files first.', 'text-red-400');
+      return;
+    }
+
+    if (pollTimer) clearInterval(pollTimer);
+    banners.innerHTML = '';
+    progressEl.style.width = '0%';
+
+    setBusy(true);
+    appendLog('Starting extraction for ' + importedRelativePaths.length + ' imported PDF(s) (replacing any existing rows)…');
+
+    try {
+      const res = await fetch('/api/extraction/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({
+          folderPath: importFolderPath,
+          filePaths: importedRelativePaths
+        })
+      });
+
+      let body = {};
+      try { body = await res.json(); } catch { /* non-json */ }
+
+      if (!res.ok) {
+        appendLog(body.error || ('Request failed (HTTP ' + res.status + ')'), 'text-red-400');
+        setBusy(false);
+        return;
+      }
+
+      const jobId = body.jobId;
+      if (!jobId) {
+        appendLog('Server did not return a job id.', 'text-red-400');
+        setBusy(false);
+        return;
+      }
+
+      appendLog('Job #' + jobId + ' queued. Processing PDFs (OCR may take several minutes per file)…');
+      const statusDiv = document.createElement('div');
+      statusDiv.id = 'statusLine';
+      statusDiv.className = 'text-[#00D4FF] mt-2';
+      logEl.appendChild(statusDiv);
+
+      pollTimer = setInterval(async function () {
+        try {
+          const st = await pollStatus(jobId);
+          if (!st) return;
+
+          const total = Math.max(st.totalFiles || 0, 1);
+          const done = (st.processedFiles || 0) + (st.skippedFiles || 0) + (st.failedFiles || 0);
+          const pct = st.totalFiles > 0 ? Math.min(100, Math.round((done / total) * 100)) : (st.status === 1 ? 5 : 0);
+          progressEl.style.width = pct + '%';
+
+          const statusLine = document.getElementById('statusLine');
+          if (statusLine && (st.status === 0 || st.status === 1 || st.status === 'Pending' || st.status === 'Running')) {
+            statusLine.textContent = 'Status: ' + statusLabel(st.status) + ' — ' + done + '/' + st.totalFiles +
+              ' files (processed ' + st.processedFiles + ', skipped ' + st.skippedFiles + ', failed ' + st.failedFiles + ')';
+          }
+
+          if (isTerminal(st.status)) {
+            clearInterval(pollTimer);
+            pollTimer = null;
+            progressEl.style.width = '100%';
+            setBusy(false);
+
+            if (st.status === 3 || st.status === 'Failed') {
+              appendLog('Extraction failed: ' + (st.errorSummary || 'Unknown error'), 'text-red-400');
+              return;
+            }
+
+            if (st.totalFiles === 0) {
+              appendLog('No PDF files were processed.', 'text-yellow-400');
+              return;
+            }
+
+            appendLog('Done: ' + st.processedFiles + ' processed, ' + st.skippedFiles + ' skipped, ' +
+              st.failedFiles + ' failed, ' + st.amendedFilesDetected + ' amended.');
+
+            if (st.failedFiles > 0) {
+              appendLog(
+                'Failed file(s): text did not match tooling templates A/B/C, or processing timed out. ' +
+                'See failed_extractions/*.txt next to the app (raw OCR text + reason).',
+                'text-yellow-400');
+            }
+
+            if (st.processedFiles > 0) {
+              banners.innerHTML =
+                '<div class="banner-amber" style="border-color:#00D4FF;color:#00D4FF">' +
+                'Extraction complete — <a class="underline" href="/FilesProcessed">View Files Processed</a> ' +
+                'or <a class="underline" href="/ExportAll">Export All</a>.</div>';
+            }
+
+            if (st.amendedFilesDetected > 0) {
+              banners.innerHTML += '<div class="banner-amber mt-2">⚠ ' + st.amendedFilesDetected +
+                ' file(s) were PDF-amended — check the Review Required sheet in the Excel export.</div>';
+            }
+          }
+        } catch (err) {
+          clearInterval(pollTimer);
+          pollTimer = null;
+          setBusy(false);
+          appendLog('Polling error: ' + err.message, 'text-red-400');
+        }
+      }, 2000);
+
+      await pollStatus(jobId);
+    } catch (err) {
+      appendLog('Error: ' + err.message, 'text-red-400');
+      setBusy(false);
+    }
+  });
+})();
+</script>
+}
+

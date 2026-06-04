@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ToolingExtractor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="~/css/app.css" />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600&display=swap" rel="stylesheet" />
+</head>
+<body class="bg-[#0A0F1A] text-gray-100 font-sans min-h-screen">
+    <div class="flex min-h-screen">
+        <aside class="w-56 bg-[#1E3A5F] p-6 flex flex-col gap-4">
+            <h1 class="text-xl font-semibold text-[#00D4FF]">ToolingExtractor</h1>
+            <p class="text-xs text-gray-300">v3.3.1</p>
+            <nav class="flex flex-col gap-2 text-sm">
+                <a class="hover:text-[#00D4FF]" asp-page="/Index">Dashboard</a>
+                <a class="hover:text-[#00D4FF]" asp-page="/Extract">Extract</a>
+                <a class="hover:text-[#00D4FF]" asp-page="/FilesProcessed">Files Processed</a>
+                <a class="hover:text-[#00D4FF]" asp-page="/ExportAll">Export All</a>
+            </nav>
+        </aside>
+        <main class="flex-1 p-8">
+            @RenderBody()
+        </main>
+    </div>
+    <script>
+    (function () {
+      var nav = performance.getEntriesByType && performance.getEntriesByType('navigation')[0];
+      var isReload = nav && nav.type === 'reload';
+      var hadSession = sessionStorage.getItem('te-session');
+      if (isReload || !hadSession) {
+        sessionStorage.setItem('te-session', '1');
+        window.__dataResetPromise = fetch('/api/data/reset', { method: 'POST', keepalive: true });
+      }
+    })();
+    window.waitForDataReset = function () {
+      return window.__dataResetPromise ? window.__dataResetPromise : Promise.resolve();
+    };
+    </script>
+    @RenderSection("Scripts", required: false)
+</body>
+</html>

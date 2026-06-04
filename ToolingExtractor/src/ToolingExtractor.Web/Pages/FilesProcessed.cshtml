@@ -1,0 +1,149 @@
+@page
+@model ToolingExtractor.Web.Pages.FilesProcessedModel
+@{
+    ViewData["Title"] = "Files Processed";
+}
+
+<h2 class="text-2xl font-semibold mb-2 text-[#00D4FF]">Files Processed</h2>
+<p class="text-sm text-gray-400 mb-4">One row per PDF. Click a tool list ID to view extracted tooling rows.</p>
+
+<div class="flex flex-wrap gap-2 mb-4">
+    <input id="partNumber" class="input" placeholder="Part" />
+    <input id="operation" class="input" placeholder="Operation" />
+    <button type="button" class="btn" id="filterBtn">Filter</button>
+    <a class="btn" href="/api/export/excel">Export Excel</a>
+</div>
+
+<div class="table-wrap">
+    <table class="w-full text-sm" id="filesTable">
+        <thead>
+            <tr>
+                <th>ToolListId</th>
+                <th>Part</th>
+                <th>Op</th>
+                <th>Rev</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+<p id="emptyMsg" class="text-gray-400 text-sm mt-4 hidden">No processed files yet. Run Extract first.</p>
+
+<div id="editModal" class="modal hidden">
+    <div class="modal-panel">
+        <h3 class="text-lg text-[#00D4FF] mb-3">Edit file metadata</h3>
+        <p id="editFileName" class="text-xs text-gray-400 mb-3"></p>
+        <input type="hidden" id="editHash" />
+        <label class="block text-xs text-gray-400 mb-1">Tool List ID</label>
+        <input id="editToolListId" class="input w-full mb-2" />
+        <label class="block text-xs text-gray-400 mb-1">Part</label>
+        <input id="editPart" class="input w-full mb-2" />
+        <label class="block text-xs text-gray-400 mb-1">Operation</label>
+        <input id="editOp" class="input w-full mb-2" />
+        <label class="block text-xs text-gray-400 mb-1">Revision</label>
+        <input id="editRev" class="input w-full mb-4" />
+        <div class="flex gap-2 justify-end">
+            <button type="button" class="btn" id="editCancel">Cancel</button>
+            <button type="button" class="btn btn-primary" id="editSave">Save</button>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+(function () {
+  const tbody = document.querySelector('#filesTable tbody');
+  const emptyMsg = document.getElementById('emptyMsg');
+  const modal = document.getElementById('editModal');
+
+  function esc(s) {
+    if (s == null) return '';
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+  }
+
+  async function loadFiles() {
+    await window.waitForDataReset();
+    const q = new URLSearchParams({
+      partNumber: document.getElementById('partNumber').value,
+      operation: document.getElementById('operation').value,
+      page: 1,
+      pageSize: 200
+    });
+    const res = await fetch('/api/files?' + q);
+    if (!res.ok) {
+      emptyMsg.textContent = 'Could not load files (HTTP ' + res.status + '). Check server logs.';
+      emptyMsg.classList.remove('hidden');
+      return;
+    }
+    const data = await res.json();
+    tbody.innerHTML = '';
+    if (!data.items || data.items.length === 0) {
+      emptyMsg.textContent = 'No processed files yet. Run Extract first.';
+      emptyMsg.classList.remove('hidden');
+      return;
+    }
+    emptyMsg.classList.add('hidden');
+    for (const f of data.items) {
+      const hash = encodeURIComponent(f.sourceFileHash);
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td><a class="link-toollist" href="/ToolListData?hash=' + hash + '">' + esc(f.toolListId || f.sourceFile) + '</a></td>' +
+        '<td>' + esc(f.partNumber) + '</td>' +
+        '<td>' + esc(f.operation) + '</td>' +
+        '<td>' + esc(f.revision) + '</td>' +
+        '<td class="actions-cell">' +
+          '<button type="button" class="btn-link edit-btn" data-hash="' + esc(f.sourceFileHash) + '">Edit</button>' +
+          '<span class="text-gray-600"> | </span>' +
+          '<button type="button" class="btn-link btn-link-danger delete-btn" data-hash="' + esc(f.sourceFileHash) + '" data-name="' + esc(f.sourceFile) + '">Delete</button>' +
+        '</td>';
+      tr.querySelector('.edit-btn').addEventListener('click', () => openEdit(f));
+      tr.querySelector('.delete-btn').addEventListener('click', () => deleteFile(f));
+      tbody.appendChild(tr);
+    }
+  }
+
+  function openEdit(f) {
+    document.getElementById('editHash').value = f.sourceFileHash;
+    document.getElementById('editFileName').textContent = f.sourceFile;
+    document.getElementById('editToolListId').value = f.toolListId || '';
+    document.getElementById('editPart').value = f.partNumber || '';
+    document.getElementById('editOp').value = f.operation || '';
+    document.getElementById('editRev').value = f.revision || '';
+    modal.classList.remove('hidden');
+  }
+
+  document.getElementById('editCancel').addEventListener('click', () => modal.classList.add('hidden'));
+  document.getElementById('editSave').addEventListener('click', async () => {
+    const hash = document.getElementById('editHash').value;
+    const body = {
+      toolListId: document.getElementById('editToolListId').value,
+      partNumber: document.getElementById('editPart').value,
+      operation: document.getElementById('editOp').value,
+      revision: document.getElementById('editRev').value
+    };
+    const res = await fetch('/api/files/' + encodeURIComponent(hash), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (res.ok) {
+      modal.classList.add('hidden');
+      await loadFiles();
+    } else {
+      alert('Could not save changes.');
+    }
+  });
+
+  async function deleteFile(f) {
+    if (!confirm('Delete all tooling data for "' + f.sourceFile + '"? This cannot be undone.')) return;
+    const res = await fetch('/api/files/' + encodeURIComponent(f.sourceFileHash), { method: 'DELETE' });
+    if (res.ok) await loadFiles();
+    else alert('Delete failed.');
+  }
+
+  document.getElementById('filterBtn').addEventListener('click', loadFiles);
+  loadFiles();
+})();
+</script>
+}

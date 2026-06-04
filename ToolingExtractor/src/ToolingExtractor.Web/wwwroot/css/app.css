@@ -1,0 +1,31 @@
+body { font-family: 'IBM Plex Sans', system-ui, sans-serif; }
+.font-mono, .log, .value { font-family: 'IBM Plex Mono', monospace; }
+.card { background: #141c2e; border: 1px solid #1E3A5F; border-radius: 8px; padding: 1rem; }
+.card .label { display: block; font-size: 0.75rem; color: #94a3b8; }
+.card .value { font-size: 1.5rem; color: #00D4FF; }
+.warn-amber { border-color: #FF6B35; }
+.warn-orange { border-color: #f97316; background: #1a1520; }
+.warn-grey { border-color: #64748b; }
+.input { background: #141c2e; border: 1px solid #334155; border-radius: 6px; padding: 0.5rem 0.75rem; color: #e2e8f0; }
+.btn { background: #1E3A5F; color: #00D4FF; padding: 0.5rem 1rem; border-radius: 6px; display: inline-block; text-decoration: none; border: none; cursor: pointer; }
+.btn:hover { background: #254770; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-secondary { background: #334155; color: #e2e8f0; }
+.btn-secondary:hover { background: #475569; }
+.log { background: #0f1628; border: 1px solid #334155; padding: 1rem; max-height: 320px; overflow: auto; }
+.banner-amber { background: #FFF3CD; color: #664d03; padding: 0.75rem; border-radius: 6px; margin-bottom: 0.5rem; }
+table th { text-align: left; color: #94a3b8; border-bottom: 1px solid #334155; padding: 0.5rem; white-space: nowrap; }
+table td { border-bottom: 1px solid #1e293b; padding: 0.5rem; vertical-align: top; }
+.table-wrap { overflow-x: auto; border: 1px solid #334155; border-radius: 8px; }
+.link-toollist { color: #00D4FF; text-decoration: underline; font-weight: 600; }
+.link-toollist:hover { color: #7dd3fc; }
+.btn-link { background: none; border: none; color: #00D4FF; cursor: pointer; padding: 0; font-size: inherit; text-decoration: underline; }
+.btn-link:hover { color: #7dd3fc; }
+.btn-link-danger { color: #f87171; }
+.btn-link-danger:hover { color: #fca5a5; }
+.actions-cell { white-space: nowrap; }
+.btn-primary { background: #00D4FF; color: #0A0F1A; font-weight: 600; }
+.btn-primary:hover { background: #7dd3fc; }
+.modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 50; }
+.modal.hidden { display: none; }
+.modal-panel { background: #141c2e; border: 1px solid #334155; border-radius: 8px; padding: 1.5rem; width: 100%; max-width: 28rem; }
