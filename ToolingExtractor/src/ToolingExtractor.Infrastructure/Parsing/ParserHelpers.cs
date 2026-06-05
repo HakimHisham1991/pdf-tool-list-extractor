@@ -337,6 +337,7 @@ internal static class ParserHelpers
     public static void ApplyHeader(ToolingRecord record, ToolingHeader header)
     {
         record.ToolListId = header.ToolListId;
+        record.ToolListNumber = header.ToolListId;
         record.PartNumber = header.PartNumber;
         record.PartDescription = header.PartDescription;
         record.Operation = header.Operation;

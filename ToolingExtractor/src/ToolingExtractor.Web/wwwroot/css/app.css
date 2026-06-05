@@ -51,6 +51,23 @@ body, .te-app {
   box-shadow: 0 1px 2px rgba(36, 83, 179, 0.04);
 }
 .card .label { display: block; font-size: 0.75rem; color: var(--te-text-muted); }
+
+.file-meta-panel {
+  border: 1px solid var(--te-border);
+  border-radius: 8px;
+  background: var(--te-surface);
+  padding: 1rem 1.25rem;
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+.file-meta-row + .file-meta-row { margin-top: 0.15rem; }
+.file-meta-label {
+  display: inline-block;
+  min-width: 10.5rem;
+  color: var(--te-text-muted);
+  font-weight: 600;
+}
+.file-meta-value { color: var(--te-text); }
 .card .value { font-size: 1.5rem; color: var(--te-primary); }
 .warn-amber { border-color: #d4a017; }
 .warn-orange { border-color: #c76a1a; background: #fff8f3; }

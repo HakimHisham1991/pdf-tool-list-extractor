@@ -1,5 +1,43 @@
 # Changelog
 
+## [3.10.4] - 2026-06-05
+
+### Changed
+
+- **CSV/Excel export** — Removed **Machine** column from export output.
+
+## [3.10.3] - 2026-06-05
+
+### Changed
+
+- **Excel export** — Single **Tool Records** sheet only (removed Summary and Review Required). Columns and row order now match CSV export exactly.
+
+## [3.10.2] - 2026-06-05
+
+### Changed
+
+- **Tool List Data header** — Structured metadata block (Filename, Tool List No., Part name, Work Centre, Machine Model, Project Code, CAM Programmer, Approved By, Tool Register By) with `#NA` when a field is missing.
+
+### Added
+
+- **`ToolListNumber`** — Stores the PDF-parsed Tool List No. separately from the filename shown in Files Processed.
+
+## [3.10.1] - 2026-06-05
+
+### Fixed
+
+- **Export row order** — CSV/Excel, Tool List Data, and DB inserts now follow the original PDF tool table order (`PdfRowOrder`), not parallel-job or tool-number sort. Python cleaning no longer re-sorts rows by tool number.
+
+## [3.10.0] - 2026-06-05
+
+### Changed
+
+- **Documentation** — Merged root `README.md` and `ToolingExtractor/README.md` into one canonical guide at the repository root; solution README now points to it.
+
+### Added
+
+- **`run.bat`** — Double-click (or run from repo root) to start `dotnet run` in `ToolingExtractor/src/ToolingExtractor.Web`.
+
 ## [3.9.9] - 2026-06-05
 
 ### Fixed

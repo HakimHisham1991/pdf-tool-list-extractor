@@ -10,6 +10,8 @@ public class ToolingRecord
     public string SourceFileHash { get; set; } = string.Empty;
 
     public string ToolListId { get; set; } = string.Empty;
+    /// <summary>Tool List No. parsed from the PDF header (distinct from filename stored in ToolListId).</summary>
+    public string ToolListNumber { get; set; } = string.Empty;
     public string PartNumber { get; set; } = string.Empty;
     public string PartDescription { get; set; } = string.Empty;
     public string Operation { get; set; } = string.Empty;
@@ -18,6 +20,9 @@ public class ToolingRecord
     public string Machine { get; set; } = string.Empty;
     public string Workcenter { get; set; } = string.Empty;
     public string MachineModel { get; set; } = string.Empty;
+
+    /// <summary>1-based row position in the source PDF tool table.</summary>
+    public int PdfRowOrder { get; set; }
 
     public string ToolNo { get; set; } = string.Empty;
     public string ToolName { get; set; } = string.Empty;

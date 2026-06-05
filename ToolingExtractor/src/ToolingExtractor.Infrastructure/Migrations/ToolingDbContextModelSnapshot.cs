@@ -175,6 +175,9 @@ namespace ToolingExtractor.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("PdfRowOrder")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("PdfType")
                         .HasColumnType("INTEGER");
 
@@ -224,6 +227,10 @@ namespace ToolingExtractor.Infrastructure.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("ToolListId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ToolListNumber")
                         .IsRequired()
                         .HasColumnType("TEXT");
 

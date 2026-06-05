@@ -1,4 +1,3 @@
-using System.Reflection;
 using System.Text;
 using ToolingExtractor.Core.Interfaces;
 using ToolingExtractor.Core.Models;
@@ -9,22 +8,18 @@ public class CsvExportService : IExportService
 {
     public Task<byte[]> ExportAsync(IEnumerable<ToolingRecord> records, CancellationToken cancellationToken = default)
     {
-        var props = typeof(ToolingRecord).GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .Where(p => p.CanRead)
-            .ToList();
+        var list = ToolingRecordOrdering.SortByPdfSequence(records);
+        var props = ToolingRecordExportColumns.Properties;
 
         using var ms = new MemoryStream();
         using var writer = new StreamWriter(ms, new UTF8Encoding(true));
         writer.WriteLine(string.Join(",", props.Select(p => Quote(p.Name))));
 
-        foreach (var record in records)
+        foreach (var record in list)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var values = props.Select(p =>
-            {
-                var v = p.GetValue(record);
-                return Quote(v?.ToString() ?? string.Empty);
-            });
+                Quote(ToolingRecordExportColumns.FormatCellValue(p.GetValue(record))));
             writer.WriteLine(string.Join(",", values));
         }
 

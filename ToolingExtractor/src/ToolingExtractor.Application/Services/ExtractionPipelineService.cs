@@ -212,12 +212,14 @@ public class ExtractionPipelineService
                     .ToList();
                 _visualizer.MarkExtractedHighlights(job.Id, toolNumbers);
 
-                foreach (var record in result.Records)
+                for (var rowIndex = 0; rowIndex < result.Records.Count; rowIndex++)
                 {
+                    var record = result.Records[rowIndex];
                     record.ExtractionJobId = job.Id;
                     record.SourceFile = relativePath;
                     record.SourceFileHash = hash;
                     record.ToolListId = displayName;
+                    record.PdfRowOrder = rowIndex + 1;
                     if (pdfType != PdfType.Digital)
                         record.ConfidenceScore = Math.Min(record.ConfidenceScore, _scannedExtractor.LastMinConfidence);
                     record.PageOrientation = _scannedExtractor.LastPageOrientation;
@@ -287,7 +289,7 @@ public class ExtractionPipelineService
         await progressCts.CancelAsync();
         try { await progressReporter; } catch (OperationCanceledException) { }
 
-        var allRecords = bag.ToList();
+        var allRecords = ToolingRecordOrdering.SortByPdfSequence(bag);
         foreach (var record in allRecords)
         {
             if (record.PdfType != PdfType.Digital)

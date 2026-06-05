@@ -410,7 +410,8 @@ public static class ExtractionApiEndpoints
             q = q.Where(r => r.ExtractionJobId == jobId.Value);
         if (!string.IsNullOrWhiteSpace(hash))
             q = q.Where(r => r.SourceFileHash == hash);
-        return await q.ToListAsync();
+        var rows = await q.ToListAsync();
+        return ToolingRecordOrdering.SortByPdfSequence(rows);
     }
 
     private static string BuildExportFileName(IReadOnlyList<ToolingRecord> records, string extension)

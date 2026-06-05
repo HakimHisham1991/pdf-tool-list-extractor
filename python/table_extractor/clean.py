@@ -122,17 +122,6 @@ def clean_dataframe(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, dict[
     if merged_rows:
         cleaned = pd.DataFrame(merged_rows, columns=CANONICAL_COLUMNS)
 
-    def _tool_sort_key(val: str) -> int:
-        text = str(val)
-        m = re.search(r"T(\d{2})", text, re.IGNORECASE)
-        if m:
-            return int(m.group(1))
-        m = re.match(r"^(\d{2})$", text)
-        return int(m.group(1)) if m else 999
-
-    if "Tool_No" in cleaned.columns and len(cleaned) > 0:
-        cleaned = cleaned.sort_values(by="Tool_No", key=lambda s: s.map(_tool_sort_key)).reset_index(drop=True)
-
     meta = {
         "row_count_raw": len(raw),
         "row_count_cleaned": len(cleaned),

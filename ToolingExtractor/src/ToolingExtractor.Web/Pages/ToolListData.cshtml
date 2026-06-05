@@ -9,7 +9,8 @@
 </div>
 
 <h2 class="page-title mb-2">Tool List Data Extracted</h2>
-<div id="fileMeta" class="text-sm text-muted mb-4"></div>
+<div id="fileMeta" class="file-meta-panel mb-4 hidden"></div>
+<p id="toolCount" class="text-sm text-accent mb-4 hidden"></p>
 <div id="exportBar" class="flex gap-2 mb-4 hidden">
     <a id="exportCsv" class="btn" href="#">Download CSV</a>
     <a id="exportExcel" class="btn" href="#">Download Excel</a>
@@ -44,6 +45,7 @@
   const params = new URLSearchParams(window.location.search);
   const hash = params.get('hash');
   const metaEl = document.getElementById('fileMeta');
+  const toolCountEl = document.getElementById('toolCount');
   const exportBar = document.getElementById('exportBar');
   const exportCsv = document.getElementById('exportCsv');
   const exportExcel = document.getElementById('exportExcel');
@@ -53,6 +55,32 @@
   function esc(s) {
     if (s == null) return '';
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  }
+
+  function displayValue(value) {
+    if (value == null) return '#NA';
+    var text = String(value).trim();
+    return text.length ? text : '#NA';
+  }
+
+  function metaLine(label, value) {
+    return '<div class="file-meta-row"><span class="file-meta-label">' + esc(label) + '</span> ' +
+      '<span class="file-meta-value">' + esc(displayValue(value)) + '</span></div>';
+  }
+
+  function renderHeader(summary) {
+    var filename = summary.sourceFile || summary.toolListId;
+    metaEl.innerHTML =
+      metaLine('Filename:', filename) +
+      metaLine('Tool List No.:', summary.toolListNumber || summary.toolListId) +
+      metaLine('Part name:', summary.partNumber) +
+      metaLine('Work Centre:', summary.workcenter) +
+      metaLine('Machine Model:', summary.machineModel) +
+      metaLine('Project Code:', summary.projectCode) +
+      metaLine('CAM Programmer :', summary.camProgrammer) +
+      metaLine('Approved By :', summary.approvedBy) +
+      metaLine('Tool Register By :', summary.toolRegisteredBy);
+    metaEl.classList.remove('hidden');
   }
 
   if (!hash) {
@@ -70,11 +98,7 @@
       return;
     }
     const data = await res.json();
-    const s = data.summary;
-    metaEl.innerHTML =
-      '<strong class="text-strong">' + esc(s.sourceFile) + '</strong> &mdash; ' +
-      esc(s.toolListId) + ' | Part: ' + esc(s.partNumber) + ' | Op: ' + esc(s.operation) +
-      ' | Rev: ' + esc(s.revision) + ' | <span class="text-accent">' + s.toolRowCount + ' tools</span>';
+    renderHeader(data.summary);
 
     const hashParam = encodeURIComponent(hash);
     exportCsv.href = '/api/export/csv?hash=' + hashParam;
@@ -84,6 +108,9 @@
     tbody.innerHTML = '';
     const toolRows = data.tools.filter(r =>
       r.toolNo && !(r.remarks && r.remarks.indexOf('PARSE_FAILED') >= 0));
+    toolCountEl.textContent = toolRows.length + ' tool' + (toolRows.length === 1 ? '' : 's') + ' extracted';
+    toolCountEl.classList.remove('hidden');
+
     for (const r of toolRows) {
       const tr = document.createElement('tr');
       tr.innerHTML =

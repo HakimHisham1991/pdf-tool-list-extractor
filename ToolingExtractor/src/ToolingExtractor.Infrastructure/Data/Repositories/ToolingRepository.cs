@@ -121,12 +121,13 @@ public class ToolingRepository
         return (items, total);
     }
 
-    public Task<List<ToolingRecord>> GetToolRowsByHashAsync(string sourceFileHash, CancellationToken ct = default) =>
-        _db.ToolingRecords.AsNoTracking()
+    public async Task<List<ToolingRecord>> GetToolRowsByHashAsync(string sourceFileHash, CancellationToken ct = default)
+    {
+        var rows = await _db.ToolingRecords.AsNoTracking()
             .Where(r => r.SourceFileHash == sourceFileHash)
-            .OrderBy(r => r.ToolNo)
-            .ThenBy(r => r.Id)
             .ToListAsync(ct);
+        return ToolingRecordOrdering.SortByPdfSequence(rows);
+    }
 
     public async Task<ProcessedFileSummary?> GetProcessedFileByHashAsync(string sourceFileHash, CancellationToken ct = default)
     {
@@ -141,12 +142,31 @@ public class ToolingRepository
             ToolListId = string.IsNullOrWhiteSpace(first.SourceFile)
                 ? first.ToolListId
                 : Path.GetFileName(first.SourceFile),
+            ToolListNumber = ResolveToolListNumber(first),
             PartNumber = first.PartNumber,
             Operation = first.Operation,
             Revision = first.Revision,
+            Workcenter = first.Workcenter,
+            MachineModel = first.MachineModel,
+            ProjectCode = first.ProjectCode,
+            CamProgrammer = first.CamProgrammer,
+            ApprovedBy = first.ApprovedBy,
+            ToolRegisteredBy = first.ToolRegisteredBy,
             ToolRowCount = CountToolRows(rows),
             ExtractedAt = rows.Max(r => r.ExtractedAt)
         };
+    }
+
+    private static string ResolveToolListNumber(ToolingRecord record)
+    {
+        if (!string.IsNullOrWhiteSpace(record.ToolListNumber))
+            return record.ToolListNumber.Trim();
+
+        var fileStem = Path.GetFileNameWithoutExtension(record.SourceFile);
+        if (!string.IsNullOrWhiteSpace(fileStem))
+            return fileStem;
+
+        return record.ToolListId;
     }
 
     public async Task<int> UpdateFileMetadataAsync(

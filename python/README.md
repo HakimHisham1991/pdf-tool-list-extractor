@@ -33,4 +33,4 @@ Exit code `0` = success, `2` = no table extracted.
 
 ## .NET integration
 
-ToolingExtractor calls this module automatically for **Template A** when `ToolingExtractor:PythonTableExtraction:Enabled` is true and `python` is available (see main README).
+ToolingExtractor calls this module automatically for **Template A** when `ToolingExtractor:PythonTableExtraction:Enabled` is true and `python` is available (see [../README.md](../README.md)).
