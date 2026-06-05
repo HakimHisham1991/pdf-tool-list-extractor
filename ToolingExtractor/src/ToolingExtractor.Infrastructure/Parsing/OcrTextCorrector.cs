@@ -5,8 +5,12 @@ namespace ToolingExtractor.Infrastructure.Parsing;
 
 public class OcrTextCorrector
 {
+    private const char Diameter = '\u00D8';
+    private const char Degree = '\u00B0';
+
     public void CorrectRecord(ToolingRecord record)
     {
+        NormalizeEngineeringSymbols(record);
         record.ToolNo = CorrectToolNumber(record.ToolNo);
         record.ToolDiameterD1 = CorrectNumericField(record.ToolDiameterD1);
         record.FluteLengthL1 = CorrectNumericField(record.FluteLengthL1);
@@ -92,4 +96,48 @@ public class OcrTextCorrector
 
     private static string CorrectDigitsInSegment(string segment) =>
         segment.Replace('O', '0').Replace('o', '0').Replace('I', '1').Replace('l', '1').Replace('B', '8');
+
+    public void NormalizeEngineeringSymbols(ToolingRecord record)
+    {
+        record.ToolName = NormalizeEngineeringSymbols(record.ToolName);
+        record.ConsumableToolDescription = NormalizeEngineeringSymbols(record.ConsumableToolDescription);
+        record.ToolSupplier = NormalizeEngineeringSymbols(record.ToolSupplier);
+        record.ToolHolder = NormalizeEngineeringSymbols(record.ToolHolder);
+        record.ArborDescription = NormalizeEngineeringSymbols(record.ArborDescription);
+        record.Remarks = NormalizeEngineeringSymbols(record.Remarks);
+        record.PartDescription = NormalizeEngineeringSymbols(record.PartDescription);
+        record.MachineModel = NormalizeEngineeringSymbols(record.MachineModel);
+    }
+
+    /// <summary>
+    /// Normalises diameter (Ø) and degree (°) symbols from PDF/OCR text and fixes common UTF-8 mojibake.
+    /// </summary>
+    public static string NormalizeEngineeringSymbols(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return value;
+
+        value = value
+            .Replace("Ã˜", "Ø", StringComparison.Ordinal)
+            .Replace("Ã¸", "ø", StringComparison.Ordinal)
+            .Replace("Â°", "°", StringComparison.Ordinal)
+            .Replace("âˆ…", "Ø", StringComparison.Ordinal)
+            .Replace("Î¦", "Ø", StringComparison.Ordinal);
+
+        value = value
+            .Replace('\u2205', Diameter)
+            .Replace('\u2300', Diameter)
+            .Replace('\u03A6', Diameter)
+            .Replace('\u03C6', Diameter)
+            .Replace('\u00F8', Diameter);
+
+        value = Regex.Replace(value, @"(\d)º", $"$1{Degree}");
+
+        // Replacement char (lost encoding) — infer from tooling naming patterns.
+        value = Regex.Replace(value, @"\uFFFD(?=\d)", Diameter.ToString());
+        value = Regex.Replace(value, @"(?<=\d)\uFFFD(?=\s|$|[^\d])", Degree.ToString());
+        value = Regex.Replace(value, @"(\d)x\uFFFD", $"$1x{Degree}");
+
+        return value;
+    }
 }

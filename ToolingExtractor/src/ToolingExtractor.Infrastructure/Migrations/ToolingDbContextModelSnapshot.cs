@@ -71,6 +71,49 @@ namespace ToolingExtractor.Infrastructure.Migrations
                     b.ToTable("ExtractionJobs");
                 });
 
+            modelBuilder.Entity("ToolingExtractor.Core.Models.FileHighlightPage", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("BoxesJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ImageHeight")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ImageWidth")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("PageCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("PageNumber")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("RelativePath")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SourceFileHash")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RelativePath");
+
+                    b.HasIndex("SourceFileHash", "PageNumber")
+                        .IsUnique();
+
+                    b.ToTable("FileHighlightPages");
+                });
+
             modelBuilder.Entity("ToolingExtractor.Core.Models.ToolingRecord", b =>
                 {
                     b.Property<int>("Id")

@@ -34,10 +34,14 @@ public class ParserA : IToolingParser
         if (rows.Count == 0 && headerIndex >= 0)
             rows = ParserHelpers.ParseWiGroupedToolRows(lines, headerIndex, _logger, sourceFile);
 
+        if (rows.Count == 0 && headerIndex >= 0)
+            rows = ParserHelpers.ParseSpaceDelimitedToolRows(lines, headerIndex, _logger, sourceFile);
+
         if (rows.Count == 0)
             rows = ParserHelpers.ParseInlineWiToolRows(extractedText, _logger, sourceFile);
 
-        if (rows.Count > 0 && rows[0].Length > 0 && Regex.IsMatch(rows[0][0], @"^T\d{2}$", RegexOptions.IgnoreCase))
+        if (rows.Count > 0 && rows[0].Length > 0 &&
+            Regex.IsMatch(rows[0][0], @"^(?:T\d{2,3}|\d{2})$", RegexOptions.IgnoreCase))
             dynamicMap = null;
 
         var records = ParserHelpers.BuildRecordsFromRows(
@@ -59,14 +63,25 @@ public class ParserA : IToolingParser
             @"Tool List\s+No\.?\s*([^\t\n\r]+)");
         h.PartNumber = MatchFirst(text,
             @"Part Number:\s*([^\n\r]+)",
-            @"Part name:\s*([^\t\n\r]+)");
+            @"Part name:\s*([^\t\n\r]+?)(?:\s+Project\s+Code\b|\s+Unit:|\s+Work\s+Centre:|\s+Workcenter:|\r|\n|$)");
         h.PartDescription = MatchMultiline(text,
             @"Part Description:\s*(.+?)(?=\r?\n\s*(?:Operation|Revision|Project|Machine|Work\s*centre|Workcenter|Tool List|Tool No))",
             @"Part name:\s*[^\t\n\r]+\t([^\t\n\r]+)");
         h.Operation = MatchFirst(text,
             @"Operation:\s*([^\n\r]+)",
-            @"Tool List\s+No\.?\s*[^\t\n\r]+\t(OP\d+[^\t\n\r]*)");
-        h.Revision = MatchFirst(text, @"Revision:\s*([^\n\r]+)", @"\b(REV\d+)\b");
+            @"Tool List\s+No\.?\s*[^\t\n\r]+\t(OP\d+[^\t\n\r]*)",
+            @"Tool List\s+No\.?\s*[^\n\r]*_(OP\d+)_");
+        if (string.IsNullOrWhiteSpace(h.Operation))
+        {
+            var op = Regex.Match(text, @"\b(OP\d+)\b", RegexOptions.IgnoreCase);
+            if (op.Success)
+                h.Operation = op.Groups[1].Value;
+        }
+
+        h.Revision = MatchFirst(text,
+            @"Revision:\s*([^\n\r]+)",
+            @"\b(REV\d+)\b",
+            @"Tool List\s+No\.?\s*[^\n\r]*_(?:OP\d+)_(REV\d+)");
         h.ProjectCode = MatchFirst(text, @"Project Code:\s*([^\n\r]+)", @"Project\s+Code\s+([^\t\n\r]+)");
         h.Machine = Match(text, @"Machine:\s*([^\n\r]+)");
         h.Workcenter = MatchFirst(text,

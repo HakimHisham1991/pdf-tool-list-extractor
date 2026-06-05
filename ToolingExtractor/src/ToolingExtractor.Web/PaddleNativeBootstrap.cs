@@ -13,6 +13,9 @@ internal static class PaddleNativeBootstrap
         if (!OperatingSystem.IsWindows())
             return;
 
+        // Paddle native (glog) emits deprecation noise on stderr; show errors only.
+        Environment.SetEnvironmentVariable("GLOG_minloglevel", "2");
+
         foreach (var dir in GetCandidateDirectories())
             PrependPath(dir);
 

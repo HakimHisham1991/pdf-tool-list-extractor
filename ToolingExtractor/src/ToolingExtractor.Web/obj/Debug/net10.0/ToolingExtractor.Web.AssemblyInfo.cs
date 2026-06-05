@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("ToolingExtractor.Web")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+5dba4e5703c4dd518498d127934c1f253a9234c5")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+9b0f23425dc8b669327bb1567d92cab43c88954d")]
 [assembly: System.Reflection.AssemblyProductAttribute("ToolingExtractor.Web")]
 [assembly: System.Reflection.AssemblyTitleAttribute("ToolingExtractor.Web")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

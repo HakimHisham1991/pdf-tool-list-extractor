@@ -1,4 +1,4 @@
-# ToolingExtractor v3.8.1
+# ToolingExtractor v3.9.9
 
 Production-oriented **aerospace CNC tooling PDF extraction** — **.NET 10** web app plus an optional **Python** bordered-table engine for Master Tooling List PDFs. It reads Work Instruction / tooling list PDFs, extracts structured tool rows, stores them in **SQLite**, and exposes a **Razor Pages** web UI plus JSON/CSV/Excel export APIs.
 
@@ -181,7 +181,7 @@ Edit **`src/ToolingExtractor.Web/appsettings.json`** → section `ToolingExtract
 | `PythonTableExtraction:Enabled` | `true` | Run Python pdfplumber/camelot/tabula for Template A. |
 | `PythonTableExtraction:PythonExecutable` | `python` | Python on PATH (or full path to venv python). |
 | `PythonTableExtraction:TimeoutSeconds` | `180` | Subprocess timeout per PDF. |
-| `PythonTableExtraction:MinimumToolRows` | `3` | Minimum valid `T##` rows to accept Python output. |
+| `PythonTableExtraction:MinimumToolRows` | `3` | Minimum valid tool rows (`T##` or numeric, e.g. `10`) to accept Python output. |
 
 **Logging** — `ToolingExtractor` namespace defaults to `Debug` in appsettings for detailed pipeline logs during development.
 
@@ -211,7 +211,7 @@ Summary counts: total records, digital vs scanned, amended PDFs, revision confli
 
 ### Files Processed (`/FilesProcessed`)
 
-One row per extracted PDF: Tool List ID (link), part, operation, revision. **Edit** metadata inline; **Delete** removes all tool rows for that file hash. Filter by part/operation. Link to bulk Excel export.
+One row per extracted PDF: **ToolListId** shows the original filename (link to tool rows), plus part, operation, revision. **Edit** metadata inline; **Delete** removes one file; **Clear Files** removes all processed files and highlight overlays. Filter by part/operation. Link to bulk Excel export.
 
 ### Tool List Data Extracted (`/ToolListData?hash=…`)
 
@@ -269,7 +269,7 @@ For **Master Tooling List** PDFs with ruled borders, the app prefers a Python pi
 Each run produces **raw** and **cleaned** row sets. Cleaning includes:
 
 - Footer/stamp row removal (`CAM Programmer`, `Approved by`, …)  
-- `T##` validation (`T01`, `T02`, …)  
+- Tool number validation (`T01`, `T02`, … or SECO numeric `10`, `11`, …)  
 - Broken decimal repair (`63 . 000` → `63.000`)  
 - Multi-line description merge for continuation rows  
 
@@ -355,7 +355,8 @@ Base URL: same origin as the web app (e.g. `http://localhost:5261`).
 | `GET` | `/api/files` | Paginated processed-file summaries. Query: `partNumber`, `operation`, `page`, `pageSize`. |
 | `GET` | `/api/files/{hash}` | File summary + all tool rows for content hash. |
 | `PATCH` | `/api/files/{hash}` | Update displayed metadata (tool list ID, part, op, rev). |
-| `DELETE` | `/api/files/{hash}` | Delete all records for hash. |
+| `DELETE` | `/api/files/all` | Delete all processed file records and highlight overlays. |
+| `DELETE` | `/api/files/{hash}` | Delete all records (and highlights) for one file hash. |
 | `GET` | `/api/records` | Paginated raw records with filters. |
 
 ### Export

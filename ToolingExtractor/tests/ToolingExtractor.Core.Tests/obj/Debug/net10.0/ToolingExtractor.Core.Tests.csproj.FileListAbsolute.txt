@@ -275,3 +275,6 @@ C:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\Toolin
 C:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\ToolingExtractor\tests\ToolingExtractor.Core.Tests\bin\Debug\net10.0\runtimes\win-arm64\native\libSkiaSharp.pdb
 C:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\ToolingExtractor\tests\ToolingExtractor.Core.Tests\bin\Debug\net10.0\runtimes\win-x64\native\libSkiaSharp.pdb
 C:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\ToolingExtractor\tests\ToolingExtractor.Core.Tests\bin\Debug\net10.0\runtimes\win-x86\native\libSkiaSharp.pdb
+c:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\ToolingExtractor\tests\ToolingExtractor.Core.Tests\bin\Debug\net10.0\System.Security.Cryptography.Pkcs.dll
+c:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\ToolingExtractor\tests\ToolingExtractor.Core.Tests\bin\Debug\net10.0\System.Security.Cryptography.Xml.dll
+c:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\ToolingExtractor\tests\ToolingExtractor.Core.Tests\bin\Debug\net10.0\runtimes\win\lib\net10.0\System.Security.Cryptography.Pkcs.dll

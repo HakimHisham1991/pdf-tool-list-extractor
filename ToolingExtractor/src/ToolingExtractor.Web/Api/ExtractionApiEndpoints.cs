@@ -2,6 +2,7 @@ using System.Security;
 using Microsoft.EntityFrameworkCore;
 using ToolingExtractor.Application.DTOs;
 using ToolingExtractor.Application.Services;
+using ToolingExtractor.Core.Enums;
 using ToolingExtractor.Core.Models;
 using ToolingExtractor.Infrastructure.Data;
 using ToolingExtractor.Infrastructure.Data.Repositories;
@@ -202,13 +203,70 @@ public static class ExtractionApiEndpoints
             return job == null ? Results.NotFound() : Results.Ok(job);
         });
 
+        app.MapPost("/api/extraction/{jobId:int}/stop", async (
+            int jobId,
+            ExtractionJobQueue queue,
+            ToolingDbContext db) =>
+        {
+            var job = await db.ExtractionJobs.FirstOrDefaultAsync(j => j.Id == jobId);
+            if (job == null)
+                return Results.NotFound();
+
+            if (job.Status is JobStatus.Completed or JobStatus.Failed or JobStatus.Cancelled)
+                return Results.Ok(new { jobId, status = job.Status.ToString(), alreadyStopped = true });
+
+            var signalled = queue.TryCancel(jobId);
+            return Results.Ok(new { jobId, status = "Stopping", signalled });
+        });
+
+        app.MapGet("/api/files/highlights", async (
+            string folderPath,
+            string relativePath,
+            int? page,
+            FolderScanService folderScan,
+            FileHashService hashService,
+            ExtractionHighlightService highlightService,
+            CancellationToken ct) =>
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(folderPath) || string.IsNullOrWhiteSpace(relativePath))
+                    return Results.BadRequest(new { error = "folderPath and relativePath are required." });
+
+                var paths = folderScan.ResolveImportedFilePaths(folderPath.Trim(), [relativePath.Trim()]);
+                if (paths.Count == 0)
+                    return Results.NotFound();
+
+                var hash = hashService.ComputeSha256(paths[0]);
+                var pageNum = Math.Max(1, page ?? 1);
+                var highlights = await highlightService.GetForFilePageAsync(hash, pageNum, ct);
+                return highlights == null
+                    ? Results.NotFound()
+                    : Results.Ok(highlights);
+            }
+            catch (SecurityException ex)
+            {
+                return Results.BadRequest(new { error = ex.Message });
+            }
+            catch (FileNotFoundException ex)
+            {
+                return Results.NotFound(new { error = ex.Message });
+            }
+        });
+
         app.MapGet("/api/extraction/{jobId:int}/visualizer", (int jobId, ExtractionVisualizerStore store) =>
         {
             var snap = store.GetSnapshot(jobId);
             return snap == null ? Results.NotFound() : Results.Ok(snap);
         });
 
-        app.MapGet("/api/extraction/{jobId:int}/visualizer/highlights", (int jobId, int? page, ExtractionVisualizerStore store) =>
+        app.MapGet("/api/extraction/{jobId:int}/visualizer/highlights", (
+            int jobId,
+            int? page,
+            string? relativePath,
+            ExtractionVisualizerStore store,
+            ToolingDbContext db,
+            FolderScanService folderScan) =>
         {
             var snap = store.GetSnapshot(jobId);
             if (snap == null)
@@ -218,7 +276,19 @@ public static class ExtractionApiEndpoints
             if (pageNum < 1)
                 pageNum = 1;
 
-            var highlights = store.GetHighlightsForPage(jobId, pageNum);
+            string? filePath = null;
+            if (!string.IsNullOrWhiteSpace(relativePath))
+            {
+                var job = db.ExtractionJobs.AsNoTracking().FirstOrDefault(j => j.Id == jobId);
+                if (job != null)
+                {
+                    var paths = folderScan.ResolveImportedFilePaths(job.FolderPath, [relativePath.Trim()]);
+                    if (paths.Count > 0)
+                        filePath = paths[0];
+                }
+            }
+
+            var highlights = store.GetHighlightsForPage(jobId, pageNum, filePath);
             return highlights == null
                 ? Results.Ok(new ExtractionHighlights { PageNumber = pageNum, PageCount = snap.PageCount })
                 : Results.Ok(highlights);
@@ -287,6 +357,12 @@ public static class ExtractionApiEndpoints
         {
             var updated = await repo.UpdateFileMetadataAsync(hash, body);
             return updated == 0 ? Results.NotFound() : Results.Ok(new { updated });
+        });
+
+        app.MapDelete("/api/files/all", async (ToolingRepository repo) =>
+        {
+            var removed = await repo.DeleteAllProcessedFilesAsync();
+            return removed == 0 ? Results.NotFound() : Results.Ok(new { removed });
         });
 
         app.MapDelete("/api/files/{hash}", async (string hash, ToolingRepository repo) =>

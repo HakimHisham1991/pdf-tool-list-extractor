@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "z4YRJ/Iu9tE=",
+  "dgSpecHash": "tgcF4pRqNQM=",
   "success": true,
   "projectFilePath": "C:\\Users\\Public\\Documents\\pdf-tool-list-extractor\\pdf-tool-list-extractor\\ToolingExtractor\\src\\ToolingExtractor.Infrastructure\\ToolingExtractor.Infrastructure.csproj",
   "expectedPackageFiles": [
@@ -60,7 +60,7 @@
     "C:\\Users\\hakim.hisham\\.nuget\\packages\\sdcb.paddleinference.runtime.win64.mkl\\3.3.1.70\\sdcb.paddleinference.runtime.win64.mkl.3.3.1.70.nupkg.sha512",
     "C:\\Users\\hakim.hisham\\.nuget\\packages\\sdcb.paddleocr\\3.3.1\\sdcb.paddleocr.3.3.1.nupkg.sha512",
     "C:\\Users\\hakim.hisham\\.nuget\\packages\\sdcb.paddleocr.knownmodels\\2.2.1.2\\sdcb.paddleocr.knownmodels.2.2.1.2.nupkg.sha512",
-    "C:\\Users\\hakim.hisham\\.nuget\\packages\\sharpcompress\\0.30.1\\sharpcompress.0.30.1.nupkg.sha512",
+    "C:\\Users\\hakim.hisham\\.nuget\\packages\\sharpcompress\\0.48.0\\sharpcompress.0.48.0.nupkg.sha512",
     "C:\\Users\\hakim.hisham\\.nuget\\packages\\sixlabors.fonts\\1.0.0\\sixlabors.fonts.1.0.0.nupkg.sha512",
     "C:\\Users\\hakim.hisham\\.nuget\\packages\\skiasharp\\3.119.2\\skiasharp.3.119.2.nupkg.sha512",
     "C:\\Users\\hakim.hisham\\.nuget\\packages\\skiasharp.harfbuzz\\3.119.1\\skiasharp.harfbuzz.3.119.1.nupkg.sha512",
@@ -84,49 +84,12 @@
     "C:\\Users\\hakim.hisham\\.nuget\\packages\\system.io.packaging\\8.0.1\\system.io.packaging.8.0.1.nupkg.sha512",
     "C:\\Users\\hakim.hisham\\.nuget\\packages\\system.reflection.metadataloadcontext\\7.0.0\\system.reflection.metadataloadcontext.7.0.0.nupkg.sha512",
     "C:\\Users\\hakim.hisham\\.nuget\\packages\\system.resources.extensions\\9.0.0\\system.resources.extensions.9.0.0.nupkg.sha512",
-    "C:\\Users\\hakim.hisham\\.nuget\\packages\\system.security.cryptography.pkcs\\9.0.0\\system.security.cryptography.pkcs.9.0.0.nupkg.sha512",
+    "C:\\Users\\hakim.hisham\\.nuget\\packages\\system.security.cryptography.pkcs\\10.0.6\\system.security.cryptography.pkcs.10.0.6.nupkg.sha512",
     "C:\\Users\\hakim.hisham\\.nuget\\packages\\system.security.cryptography.protecteddata\\9.0.0\\system.security.cryptography.protecteddata.9.0.0.nupkg.sha512",
-    "C:\\Users\\hakim.hisham\\.nuget\\packages\\system.security.cryptography.xml\\9.0.0\\system.security.cryptography.xml.9.0.0.nupkg.sha512",
+    "C:\\Users\\hakim.hisham\\.nuget\\packages\\system.security.cryptography.xml\\10.0.6\\system.security.cryptography.xml.10.0.6.nupkg.sha512",
     "C:\\Users\\hakim.hisham\\.nuget\\packages\\system.security.permissions\\9.0.0\\system.security.permissions.9.0.0.nupkg.sha512",
     "C:\\Users\\hakim.hisham\\.nuget\\packages\\system.windows.extensions\\9.0.0\\system.windows.extensions.9.0.0.nupkg.sha512",
     "C:\\Users\\hakim.hisham\\.nuget\\packages\\yamldotnet\\16.3.0\\yamldotnet.16.3.0.nupkg.sha512"
   ],
-  "logs": [
-    {
-      "code": "NU1902",
-      "level": "Warning",
-      "message": "Package 'SharpCompress' 0.30.1 has a known moderate severity vulnerability, https://github.com/advisories/GHSA-6c8g-7p36-r338",
-      "projectPath": "C:\\Users\\Public\\Documents\\pdf-tool-list-extractor\\pdf-tool-list-extractor\\ToolingExtractor\\src\\ToolingExtractor.Infrastructure\\ToolingExtractor.Infrastructure.csproj",
-      "warningLevel": 1,
-      "filePath": "C:\\Users\\Public\\Documents\\pdf-tool-list-extractor\\pdf-tool-list-extractor\\ToolingExtractor\\src\\ToolingExtractor.Infrastructure\\ToolingExtractor.Infrastructure.csproj",
-      "libraryId": "SharpCompress",
-      "targetGraphs": [
-        "net10.0"
-      ]
-    },
-    {
-      "code": "NU1903",
-      "level": "Warning",
-      "message": "Package 'System.Security.Cryptography.Xml' 9.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-37gx-xxp4-5rgx",
-      "projectPath": "C:\\Users\\Public\\Documents\\pdf-tool-list-extractor\\pdf-tool-list-extractor\\ToolingExtractor\\src\\ToolingExtractor.Infrastructure\\ToolingExtractor.Infrastructure.csproj",
-      "warningLevel": 1,
-      "filePath": "C:\\Users\\Public\\Documents\\pdf-tool-list-extractor\\pdf-tool-list-extractor\\ToolingExtractor\\src\\ToolingExtractor.Infrastructure\\ToolingExtractor.Infrastructure.csproj",
-      "libraryId": "System.Security.Cryptography.Xml",
-      "targetGraphs": [
-        "net10.0"
-      ]
-    },
-    {
-      "code": "NU1903",
-      "level": "Warning",
-      "message": "Package 'System.Security.Cryptography.Xml' 9.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-w3x6-4m5h-cxqf",
-      "projectPath": "C:\\Users\\Public\\Documents\\pdf-tool-list-extractor\\pdf-tool-list-extractor\\ToolingExtractor\\src\\ToolingExtractor.Infrastructure\\ToolingExtractor.Infrastructure.csproj",
-      "warningLevel": 1,
-      "filePath": "C:\\Users\\Public\\Documents\\pdf-tool-list-extractor\\pdf-tool-list-extractor\\ToolingExtractor\\src\\ToolingExtractor.Infrastructure\\ToolingExtractor.Infrastructure.csproj",
-      "libraryId": "System.Security.Cryptography.Xml",
-      "targetGraphs": [
-        "net10.0"
-      ]
-    }
-  ]
+  "logs": []
 }

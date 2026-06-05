@@ -54,7 +54,8 @@ HEADER_ALIASES: dict[str, str] = {
     "remarks": "Remarks",
 }
 
-TOOL_NO_PATTERN = re.compile(r"^T\d{2}$", re.IGNORECASE)
+# T01-style or SECO numeric (10, 11, …) tool numbers.
+TOOL_NO_PATTERN = re.compile(r"^(?:T\d{2}|\d{2})$", re.IGNORECASE)
 FOOTER_MARKERS = (
     "cam programmer",
     "approved by",

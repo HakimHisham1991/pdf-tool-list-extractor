@@ -16,6 +16,8 @@
       <input id="pdfPicker" type="file" accept=".pdf,application/pdf" multiple class="hidden" />
       <button id="importBtn" type="button" class="btn">Import Files</button>
       <button id="startBtn" type="button" class="btn" disabled>Extract Tooling Data</button>
+      <button id="stopBtn" type="button" class="btn">Stop</button>
+      <button id="clearAllBtn" type="button" class="btn">Clear All</button>
       <span id="elapsedWrap" class="hidden ml-2 text-sm text-muted">Elapsed: <span id="elapsedTimer" class="extract-timer">00:00:00</span></span>
     </div>
 
@@ -72,6 +74,8 @@
   const logEl = document.getElementById('log');
   const banners = document.getElementById('banners');
   const startBtn = document.getElementById('startBtn');
+  const stopBtn = document.getElementById('stopBtn');
+  const clearAllBtn = document.getElementById('clearAllBtn');
   const importBtn = document.getElementById('importBtn');
   const pdfPicker = document.getElementById('pdfPicker');
   const progressEl = document.getElementById('progress');
@@ -234,6 +238,16 @@
     }, 250);
   }
 
+  function resetElapsedClock() {
+    if (elapsedTimerId) {
+      clearInterval(elapsedTimerId);
+      elapsedTimerId = null;
+    }
+    extractStartedAt = null;
+    elapsedTimer.textContent = '00:00:00';
+    elapsedWrap.classList.add('hidden');
+  }
+
   function stopElapsedClock() {
     if (elapsedTimerId) {
       clearInterval(elapsedTimerId);
@@ -271,7 +285,25 @@
 
   function setExtractBusy(busy) {
     startBtn.disabled = busy || importedFiles.length === 0;
+    clearAllBtn.disabled = busy;
     startBtn.textContent = busy ? 'Extracting…' : 'Extract Tooling Data';
+  }
+
+  function clearAllWorkspace() {
+    if (pollTimer) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
+    stopVisualizerPolling();
+    resetElapsedClock();
+    setExtractBusy(false);
+    activeJobId = null;
+    banners.innerHTML = '';
+    progressEl.style.width = '0%';
+    logEl.innerHTML = '';
+    clearImportUi(true);
+    clearPreviewPanel();
+    saveWorkspace();
   }
 
   function clearPreviewPanel() {
@@ -352,14 +384,49 @@
     });
   }
 
-  async function loadHighlights(jobId, page) {
+  async function loadHighlights(jobId, page, relativePath) {
     if (!jobId) return;
     try {
-      var res = await fetch('/api/extraction/' + jobId + '/visualizer/highlights?page=' + page);
+      var url = '/api/extraction/' + jobId + '/visualizer/highlights?page=' + page;
+      if (relativePath) {
+        url += '&relativePath=' + encodeURIComponent(relativePath);
+      }
+      var res = await fetch(url);
       if (!res.ok) return;
       currentHighlights = await res.json();
       redrawHighlights();
     } catch (e) { /* ignore */ }
+  }
+
+  async function loadStaticHighlights(relativePath, page) {
+    if (!importFolderPath || !relativePath) {
+      currentHighlights = null;
+      layerControls.classList.add('hidden');
+      redrawHighlights();
+      return;
+    }
+
+    clearHighlightCanvas();
+    currentHighlights = null;
+
+    try {
+      var url = '/api/files/highlights?folderPath=' + encodeURIComponent(importFolderPath) +
+        '&relativePath=' + encodeURIComponent(relativePath) + '&page=' + page;
+      var res = await fetch(url);
+      if (res.ok) {
+        currentHighlights = await res.json();
+        layerControls.classList.remove('hidden');
+      } else if (activeJobId) {
+        await loadHighlights(activeJobId, page, relativePath);
+        var hasBoxes = currentHighlights && currentHighlights.boxes && currentHighlights.boxes.length > 0;
+        layerControls.classList.toggle('hidden', !hasBoxes);
+      } else {
+        layerControls.classList.add('hidden');
+      }
+    } catch (e) {
+      layerControls.classList.add('hidden');
+    }
+    redrawHighlights();
   }
 
   function resetLayerToggles() {
@@ -404,7 +471,7 @@
       '&page=' + (previewPageIndex + 1);
 
     if (url === lastStaticPreviewUrl && !vizImageWrap.classList.contains('hidden')) {
-      redrawHighlights();
+      loadStaticHighlights(previewRelativePath, previewPageIndex + 1);
       return;
     }
 
@@ -412,12 +479,11 @@
     vizPlaceholder.textContent = 'Loading preview…';
     vizPlaceholder.classList.remove('hidden');
     vizImageWrap.classList.add('hidden');
-    layerControls.classList.add('hidden');
 
     vizImage.onload = function () {
       vizPlaceholder.classList.add('hidden');
       vizImageWrap.classList.remove('hidden');
-      redrawHighlights();
+      loadStaticHighlights(previewRelativePath, previewPageIndex + 1);
     };
     vizImage.onerror = function () {
       vizImageWrap.classList.add('hidden');
@@ -451,7 +517,7 @@
       vizPlaceholder.classList.add('hidden');
       vizImageWrap.classList.remove('hidden');
       layerControls.classList.remove('hidden');
-      loadHighlights(activeJobId, page);
+      loadHighlights(activeJobId, page, null);
     };
     vizImage.onerror = function () {
       vizImageWrap.classList.add('hidden');
@@ -462,7 +528,7 @@
     if (pageChanged || !vizImage.src || vizImage.src.indexOf(url) === -1) {
       vizImage.src = url;
     } else {
-      loadHighlights(activeJobId, page);
+      loadHighlights(activeJobId, page, null);
     }
   }
 
@@ -489,7 +555,7 @@
         loadExtractionPreviewImage(true);
       } else if (snap.updatedAtUtc && snap.updatedAtUtc !== lastSnapUpdatedAt) {
         lastSnapUpdatedAt = snap.updatedAtUtc;
-        await loadHighlights(jobId, previewPageIndex + 1);
+        await loadHighlights(jobId, previewPageIndex + 1, null);
       }
     } catch (e) { /* ignore */ }
   }
@@ -518,17 +584,17 @@
 
     stopVisualizerPolling();
     extractionPreviewMode = false;
-    activeJobId = null;
     lastLoadedPreviewKey = '';
     lastSnapUpdatedAt = '';
     lastStaticPreviewUrl = '';
-    layerControls.classList.add('hidden');
+    clearHighlightCanvas();
     currentHighlights = null;
 
     previewRelativePath = relativePath;
     previewFileName = fileName || relativePath;
     previewPageIndex = 0;
     previewPageCount = 1;
+    previewPageNav.dataset.userNav = '1';
 
     highlightPreviewRow(relativePath);
     previewCaption.textContent = previewFileName;
@@ -632,13 +698,14 @@
   }
 
   function statusLabel(status) {
-    var names = ['Pending', 'Running', 'Completed', 'Failed'];
+    var names = ['Pending', 'Running', 'Completed', 'Failed', 'Cancelled'];
     if (typeof status === 'string') return status;
     return names[status] ?? String(status);
   }
 
   function isTerminal(status) {
-    return status === 2 || status === 3 || status === 'Completed' || status === 'Failed';
+    return status === 2 || status === 3 || status === 4 ||
+      status === 'Completed' || status === 'Failed' || status === 'Cancelled';
   }
 
   async function pollStatus(jobId) {
@@ -658,6 +725,26 @@
 
   importBtn.addEventListener('click', function () {
     pdfPicker.click();
+  });
+
+  stopBtn.addEventListener('click', async function () {
+    if (!activeJobId) {
+      appendLog('No extraction is running.', 'log-warn');
+      return;
+    }
+    try {
+      await fetch('/api/extraction/' + activeJobId + '/stop', { method: 'POST' });
+      appendLog('Stop requested — processing will pause after the current file.', 'log-warn');
+      stopVisualizerPolling();
+      stopElapsedClock();
+      clearAllBtn.disabled = false;
+    } catch (err) {
+      appendLog('Could not stop extraction: ' + err.message, 'log-error');
+    }
+  });
+
+  clearAllBtn.addEventListener('click', function () {
+    clearAllWorkspace();
   });
 
   pdfPicker.addEventListener('change', async function () {
@@ -785,16 +872,27 @@
           if (isTerminal(st.status)) {
             clearInterval(pollTimer);
             pollTimer = null;
-            stopVisualizerPolling();
+            if (st.status !== 4 && st.status !== 'Cancelled') {
+              stopVisualizerPolling();
+            }
             stopElapsedClock();
-            progressEl.style.width = '100%';
+            progressEl.style.width = st.status === 4 || st.status === 'Cancelled'
+              ? progressEl.style.width
+              : '100%';
             setExtractBusy(false);
 
-            pollVisualizer(jobId);
+            if (st.status !== 4 && st.status !== 'Cancelled') {
+              pollVisualizer(jobId);
+            }
             saveWorkspace();
 
             if (st.status === 3 || st.status === 'Failed') {
               appendLog('Extraction failed: ' + (st.errorSummary || 'Unknown error'), 'log-error');
+              return;
+            }
+
+            if (st.status === 4 || st.status === 'Cancelled') {
+              appendLog('Extraction stopped.', 'log-warn');
               return;
             }
 

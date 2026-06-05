@@ -12,6 +12,31 @@ from .columns import CANONICAL_COLUMNS, FOOTER_MARKERS, TOOL_NO_PATTERN, is_foot
 _SPACE_RE = re.compile(r"\s+")
 _BROKEN_DECIMAL_RE = re.compile(r"(\d)\s+[\.,]\s+(\d)")
 _MULTI_DOT_RE = re.compile(r"\.{2,}")
+_DIAMETER_ALTS = str.maketrans(
+    {
+        "\u2205": "\u00d8",
+        "\u2300": "\u00d8",
+        "\u03a6": "\u00d8",
+        "\u03c6": "\u00d8",
+        "\u00f8": "\u00d8",
+    }
+)
+_MOJIBAKE_REPLACEMENTS = (
+    ("Ã˜", "Ø"),
+    ("Ã¸", "ø"),
+    ("Â°", "°"),
+)
+
+
+def _normalize_engineering_symbols(text: str) -> str:
+    for bad, good in _MOJIBAKE_REPLACEMENTS:
+        text = text.replace(bad, good)
+    text = text.translate(_DIAMETER_ALTS)
+    text = re.sub(r"(\d)º", r"\1°", text)
+    text = re.sub(r"\ufffd(?=\d)", "Ø", text)
+    text = re.sub(r"(?<=\d)\ufffd(?=\s|$|[^\d])", "°", text)
+    text = re.sub(r"(\d)x\ufffd", r"\1x°", text)
+    return text
 
 
 def _clean_cell(value: Any) -> str:
@@ -21,13 +46,16 @@ def _clean_cell(value: Any) -> str:
     text = _SPACE_RE.sub(" ", text).strip()
     text = _BROKEN_DECIMAL_RE.sub(r"\1.\2", text)
     text = text.replace(",", ".") if re.search(r"\d,\d{2}\b", text) else text
-    return text
+    return _normalize_engineering_symbols(text)
 
 
 def normalize_tool_no(value: str) -> str:
     text = _clean_cell(value).upper()
     m = re.search(r"\bT\d{2}\b", text)
-    return m.group(0).upper() if m else text
+    if m:
+        return m.group(0).upper()
+    m = re.match(r"^(\d{2})$", text)
+    return m.group(1) if m else text
 
 
 def is_valid_tool_row(tool_no: str) -> bool:
@@ -95,7 +123,11 @@ def clean_dataframe(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, dict[
         cleaned = pd.DataFrame(merged_rows, columns=CANONICAL_COLUMNS)
 
     def _tool_sort_key(val: str) -> int:
-        m = re.search(r"T(\d{2})", str(val), re.IGNORECASE)
+        text = str(val)
+        m = re.search(r"T(\d{2})", text, re.IGNORECASE)
+        if m:
+            return int(m.group(1))
+        m = re.match(r"^(\d{2})$", text)
         return int(m.group(1)) if m else 999
 
     if "Tool_No" in cleaned.columns and len(cleaned) > 0:

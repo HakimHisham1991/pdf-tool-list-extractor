@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Runtime.Versioning;
 using System.Security.Principal;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -32,6 +33,7 @@ public class ExtractionPipelineService
     private readonly ToolingExtractorOptions _options;
     private readonly ILogger<ExtractionPipelineService> _logger;
     private readonly IExtractionVisualizerNotifier _visualizer;
+    private readonly ExtractionHighlightService _highlightService;
 
     public ExtractionPipelineService(
         ToolingDbContext db,
@@ -47,7 +49,8 @@ public class ExtractionPipelineService
         ToolingRepository repository,
         IOptions<ToolingExtractorOptions> options,
         ILogger<ExtractionPipelineService> logger,
-        IExtractionVisualizerNotifier visualizer)
+        IExtractionVisualizerNotifier visualizer,
+        ExtractionHighlightService highlightService)
     {
         _db = db;
         _folderScan = folderScan;
@@ -63,6 +66,7 @@ public class ExtractionPipelineService
         _options = options.Value;
         _logger = logger;
         _visualizer = visualizer;
+        _highlightService = highlightService;
     }
 
     /// <summary>Validates path, creates a job, and returns immediately (processing runs via <see cref="ExecuteExtractionAsync"/>).</summary>
@@ -132,17 +136,21 @@ public class ExtractionPipelineService
         var tasks = files.Select(async filePath =>
         {
             await semaphore.WaitAsync(cancellationToken);
+            var relativePath = Path.GetRelativePath(canonicalFolder, filePath);
+            var displayName = Path.GetFileName(relativePath);
+            var hash = _hashService.ComputeSha256(filePath);
+
+            var fileStarted = false;
             try
             {
+                cancellationToken.ThrowIfCancellationRequested();
+
                 using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 var fileTimeout = Math.Max(60, _options.PerFileTimeoutSeconds);
                 timeoutCts.CancelAfter(TimeSpan.FromSeconds(fileTimeout));
 
-                var relativePath = Path.GetRelativePath(canonicalFolder, filePath);
-                var displayName = Path.GetFileName(relativePath);
-                var hash = _hashService.ComputeSha256(filePath);
-
                 _visualizer.BeginFile(job.Id, filePath, displayName);
+                fileStarted = true;
                 using var vizScope = ExtractionVisualizerScope.Begin(job.Id, filePath);
 
                 if (await _repository.HashExistsAsync(hash, timeoutCts.Token))
@@ -209,6 +217,7 @@ public class ExtractionPipelineService
                     record.ExtractionJobId = job.Id;
                     record.SourceFile = relativePath;
                     record.SourceFileHash = hash;
+                    record.ToolListId = displayName;
                     if (pdfType != PdfType.Digital)
                         record.ConfidenceScore = Math.Min(record.ConfidenceScore, _scannedExtractor.LastMinConfidence);
                     record.PageOrientation = _scannedExtractor.LastPageOrientation;
@@ -218,6 +227,10 @@ public class ExtractionPipelineService
                 }
 
                 Interlocked.Increment(ref processed);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                _logger.LogInformation("Extraction cancelled while processing {File}", relativePath);
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
@@ -243,27 +256,65 @@ public class ExtractionPipelineService
             }
             finally
             {
-                _visualizer.EndFile(job.Id);
+                if (fileStarted)
+                {
+                    try
+                    {
+                        await _highlightService.SaveFromVisualizerAsync(
+                            job.Id, hash, relativePath, filePath, CancellationToken.None);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Could not persist highlight overlays for {File}", relativePath);
+                    }
+
+                    _visualizer.EndFile(job.Id);
+                }
+
                 semaphore.Release();
             }
         });
 
-        await Task.WhenAll(tasks);
+        try
+        {
+            await Task.WhenAll(tasks);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogInformation("Extraction job {JobId} cancelled", jobId);
+        }
+
         await progressCts.CancelAsync();
         try { await progressReporter; } catch (OperationCanceledException) { }
 
         var allRecords = bag.ToList();
-        foreach (var record in allRecords.Where(r => r.PdfType != PdfType.Digital))
-            _ocrCorrector.CorrectRecord(record);
+        foreach (var record in allRecords)
+        {
+            if (record.PdfType != PdfType.Digital)
+                _ocrCorrector.CorrectRecord(record);
+            else
+                _ocrCorrector.NormalizeEngineeringSymbols(record);
+        }
 
-        await BulkInsertWithRetryAsync(allRecords, cancellationToken);
+        if (allRecords.Count > 0)
+            await BulkInsertWithRetryAsync(allRecords, cancellationToken);
 
         job.SkippedFiles = skipped;
         job.ProcessedFiles = processed;
         job.FailedFiles = failed;
         job.AmendedFilesDetected = amended;
-        job.Status = JobStatus.Completed;
         job.CompletedAt = DateTime.UtcNow;
+
+        if (cancellationToken.IsCancellationRequested)
+        {
+            job.Status = JobStatus.Cancelled;
+            job.ErrorSummary = "Stopped by user";
+        }
+        else
+        {
+            job.Status = JobStatus.Completed;
+        }
+
         await _db.SaveChangesAsync(cancellationToken);
         return job;
     }
@@ -434,13 +485,21 @@ public class ExtractionPipelineService
 
     private static string GetTriggeredBy()
     {
-        try
+        if (OperatingSystem.IsWindows())
         {
-            return WindowsIdentity.GetCurrent().Name;
+            try
+            {
+                return GetWindowsTriggeredBy();
+            }
+            catch
+            {
+                /* fall through */
+            }
         }
-        catch
-        {
-            return Environment.UserName;
-        }
+
+        return Environment.UserName;
     }
+
+    [SupportedOSPlatform("windows")]
+    private static string GetWindowsTriggeredBy() => WindowsIdentity.GetCurrent().Name;
 }

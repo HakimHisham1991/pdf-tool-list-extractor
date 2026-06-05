@@ -119,7 +119,7 @@ public class TemplateAParseService
                 ToolCornerRadius = row.Total_Corner_Radius,
                 ArborDescription = row.Anchor_Description,
                 ToolPathTimeMinutes = row.Tool_Path_Time_In_Minutes,
-                Remarks = AppendExtractionMeta(row.Remarks, python.Method, python.Raw)
+                Remarks = row.Remarks?.Trim() ?? string.Empty
             };
 
             ParserHelpers.ApplyHeader(record, header);
@@ -131,12 +131,6 @@ public class TemplateAParseService
             return textResult;
 
         return new ExtractionResult { Header = header, Footer = footer, Records = records };
-    }
-
-    private static string AppendExtractionMeta(string remarks, string method, List<PythonToolTableRow> raw)
-    {
-        var tag = $"[TABLE:{method};raw={raw.Count}]";
-        return string.IsNullOrWhiteSpace(remarks) ? tag : $"{remarks.Trim()} {tag}";
     }
 
     private void PublishPythonHighlights(int jobId, PythonTableExtractionPayload python)

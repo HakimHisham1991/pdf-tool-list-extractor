@@ -16,6 +16,7 @@
     <PackageReference Include="Sdcb.PaddleOCR.KnownModels" Version="2.2.1.2" />
     <PackageReference Include="OpenCvSharp4" Version="4.11.0.20250507" />
     <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.11.0.20250507" />
+    <PackageReference Include="SharpCompress" Version="0.48.0" />
     <PackageReference Include="SkiaSharp" Version="3.119.2" />
     <PackageReference Include="PDFtoImage" Version="5.2.1" />
     <PackageReference Include="ClosedXML" Version="0.104.2" />
@@ -26,6 +27,7 @@
     </PackageReference>
     <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.0" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.6" />
   </ItemGroup>
 
   <ItemGroup>

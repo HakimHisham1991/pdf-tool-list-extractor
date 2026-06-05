@@ -9,6 +9,7 @@ public class ToolingDbContext : DbContext
 
     public DbSet<ToolingRecord> ToolingRecords => Set<ToolingRecord>();
     public DbSet<ExtractionJob> ExtractionJobs => Set<ExtractionJob>();
+    public DbSet<FileHighlightPage> FileHighlightPages => Set<FileHighlightPage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -31,6 +32,13 @@ public class ToolingDbContext : DbContext
         {
             e.HasKey(x => x.Id);
             e.HasMany(x => x.Records).WithOne().HasForeignKey(x => x.ExtractionJobId);
+        });
+
+        modelBuilder.Entity<FileHighlightPage>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.SourceFileHash, x.PageNumber }).IsUnique();
+            e.HasIndex(x => x.RelativePath);
         });
     }
 }

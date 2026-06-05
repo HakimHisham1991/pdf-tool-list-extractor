@@ -8,6 +8,14 @@ namespace ToolingExtractor.Infrastructure.Parsing;
 
 internal static class ParserHelpers
 {
+    private static readonly Regex ToolRowStartRegex = new(
+        @"^\s*(?:T\d{2,3}|\d{2})\b",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    private static readonly Regex ToolRowDimensionRegex = new(
+        @"\d+\.\d{3}",
+        RegexOptions.Compiled);
+
     private static readonly Dictionary<string, string> ColumnAliases = new(StringComparer.OrdinalIgnoreCase)
     {
         ["tool no"] = nameof(ToolingRecord.ToolNo),
@@ -126,7 +134,7 @@ internal static class ParserHelpers
         string[] lines, int headerIndex, ILogger logger, string sourceFile)
     {
         var rows = new List<string[]>();
-        var toolStart = new Regex(@"^\s*(T\d+)\b", RegexOptions.IgnoreCase);
+        var toolStart = ToolRowStartRegex;
         var footerRegex = new Regex(@"^\s*(CAM Programmer|Approved by|Tool Register)", RegexOptions.IgnoreCase);
         var buffer = new List<string>();
 
@@ -176,7 +184,7 @@ internal static class ParserHelpers
         var footerIdx = IndexOfFooter(text);
         var body = footerIdx > 0 ? text[..footerIdx] : text;
 
-        var matches = Regex.Matches(body, @"\bT\d{2}\b", RegexOptions.IgnoreCase);
+        var matches = Regex.Matches(body, @"\b(?:T\d{2,3}|\d{2})\b", RegexOptions.IgnoreCase);
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         for (var i = 0; i < matches.Count; i++)
@@ -211,6 +219,44 @@ internal static class ParserHelpers
             else
                 logger.LogInformation("SKIP inline WI segment for {Tool} — {Count} tokens (file: {File})",
                     toolNo, tokens.Length, sourceFile);
+        }
+
+        return rows;
+    }
+
+    /// <summary>
+    /// SECO-stamped Master Tooling Lists often use numeric tool numbers (10, 11, …) on one space-delimited line per tool.
+    /// </summary>
+    public static List<string[]> ParseSpaceDelimitedToolRows(
+        string[] lines, int headerIndex, ILogger logger, string sourceFile)
+    {
+        var rows = new List<string[]>();
+        var footerRegex = new Regex(@"^\s*(CAM Programmer|Approved by|Tool Register)", RegexOptions.IgnoreCase);
+
+        for (var i = headerIndex + 1; i < lines.Length; i++)
+        {
+            var line = lines[i].Trim();
+            if (string.IsNullOrWhiteSpace(line))
+                continue;
+            if (footerRegex.IsMatch(line))
+                break;
+
+            if (line.Contains("Tool No", StringComparison.OrdinalIgnoreCase) ||
+                line.Contains("(D1)", StringComparison.OrdinalIgnoreCase) ||
+                line.Contains("Diameter", StringComparison.OrdinalIgnoreCase) ||
+                line.Contains("Flute", StringComparison.OrdinalIgnoreCase) ||
+                line.Contains("Path Time", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            if (!ToolRowStartRegex.IsMatch(line) || !ToolRowDimensionRegex.IsMatch(line))
+                continue;
+
+            var tokens = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (tokens.Length >= 6)
+                rows.Add(tokens);
+            else
+                logger.LogInformation("SKIP space-delimited row '{Raw}' — {Count} tokens (file: {File})",
+                    line, tokens.Length, sourceFile);
         }
 
         return rows;

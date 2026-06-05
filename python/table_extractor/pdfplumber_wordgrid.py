@@ -9,8 +9,10 @@ import pdfplumber
 
 from .columns import FOOTER_MARKERS, is_footer_row
 
-TOOL_ROW_RE = re.compile(r"^T(\d{2})\b", re.IGNORECASE)
-TOOL_NO_CELL_RE = re.compile(r"\bT\d{2}\b", re.IGNORECASE)
+# Master Tooling List rows use T01… or numeric tool numbers (e.g. 10, 11) on SECO-stamped PDFs.
+TOOL_ROW_RE = re.compile(r"^(?:T(\d{2,3})|(\d{2}))\b", re.IGNORECASE)
+TOOL_NO_CELL_RE = re.compile(r"^(?:T\d{2,3}|\d{2})\b", re.IGNORECASE)
+DIMENSION_RE = re.compile(r"\d+\.\d{3}")
 NUMERIC_CELL_RE = re.compile(r"^\d+\.\d{3}$|^--$")
 
 
@@ -112,7 +114,7 @@ def extract_with_wordgrid(pdf_path: str) -> tuple[list[list[str | None]] | None,
                     prefix_words.extend(line_words)
                 continue
 
-            if TOOL_ROW_RE.match(text):
+            if TOOL_ROW_RE.match(text) and DIMENSION_RE.search(text):
                 started = True
                 cols = _assign_words_to_cols(line_words, bounds)
                 cols = _merge_prefix_lines(cols, prefix_words, bounds)
@@ -130,7 +132,7 @@ def extract_with_wordgrid(pdf_path: str) -> tuple[list[list[str | None]] | None,
             if any(_col_index(w["x0"], bounds) <= 2 for w in line_words):
                 prefix_words.extend(line_words)
 
-        if len(body_rows) < 3:
+        if len(body_rows) < 1:
             return None, None, f"wordgrid: only {len(body_rows)} tool rows"
 
         header_cells = [

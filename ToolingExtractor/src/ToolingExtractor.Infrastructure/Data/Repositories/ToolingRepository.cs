@@ -14,10 +14,34 @@ public class ToolingRepository
 
     public async Task<int> DeleteByHashAsync(string hash, CancellationToken ct = default)
     {
+        var highlights = await _db.FileHighlightPages.Where(p => p.SourceFileHash == hash).ToListAsync(ct);
+        if (highlights.Count > 0)
+            _db.FileHighlightPages.RemoveRange(highlights);
+
         var rows = await _db.ToolingRecords.Where(r => r.SourceFileHash == hash).ToListAsync(ct);
-        if (rows.Count == 0)
+        if (rows.Count == 0 && highlights.Count == 0)
             return 0;
-        _db.ToolingRecords.RemoveRange(rows);
+
+        if (rows.Count > 0)
+            _db.ToolingRecords.RemoveRange(rows);
+
+        await _db.SaveChangesAsync(ct);
+        return rows.Count;
+    }
+
+    public async Task<int> DeleteAllProcessedFilesAsync(CancellationToken ct = default)
+    {
+        var highlights = await _db.FileHighlightPages.ToListAsync(ct);
+        if (highlights.Count > 0)
+            _db.FileHighlightPages.RemoveRange(highlights);
+
+        var rows = await _db.ToolingRecords.ToListAsync(ct);
+        if (rows.Count == 0 && highlights.Count == 0)
+            return 0;
+
+        if (rows.Count > 0)
+            _db.ToolingRecords.RemoveRange(rows);
+
         await _db.SaveChangesAsync(ct);
         return rows.Count;
     }
@@ -79,7 +103,9 @@ public class ToolingRepository
                 {
                     SourceFileHash = g.Key,
                     SourceFile = latest.SourceFile,
-                    ToolListId = latest.ToolListId,
+                    ToolListId = string.IsNullOrWhiteSpace(latest.SourceFile)
+                        ? latest.ToolListId
+                        : Path.GetFileName(latest.SourceFile),
                     PartNumber = latest.PartNumber,
                     Operation = latest.Operation,
                     Revision = latest.Revision,
@@ -112,7 +138,9 @@ public class ToolingRepository
         {
             SourceFileHash = sourceFileHash,
             SourceFile = first.SourceFile,
-            ToolListId = first.ToolListId,
+            ToolListId = string.IsNullOrWhiteSpace(first.SourceFile)
+                ? first.ToolListId
+                : Path.GetFileName(first.SourceFile),
             PartNumber = first.PartNumber,
             Operation = first.Operation,
             Revision = first.Revision,

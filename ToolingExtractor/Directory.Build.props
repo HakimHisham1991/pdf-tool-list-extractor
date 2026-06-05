@@ -1,0 +1,6 @@
+<Project>
+  <PropertyGroup>
+    <!-- PaddleSharp + PDFium are Windows-native; annotate platform-specific APIs correctly. -->
+    <SupportedOSPlatformVersion>windows10.0.17763.0</SupportedOSPlatformVersion>
+  </PropertyGroup>
+</Project>

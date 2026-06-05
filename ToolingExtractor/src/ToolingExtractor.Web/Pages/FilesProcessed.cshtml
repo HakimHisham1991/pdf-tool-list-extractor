@@ -11,6 +11,7 @@
     <input id="partNumber" class="input" placeholder="Part" />
     <input id="operation" class="input" placeholder="Operation" />
     <button type="button" class="btn" id="filterBtn">Filter</button>
+    <button type="button" class="btn btn-clear-files" id="clearFilesBtn">Clear Files</button>
     <a class="btn" href="/api/export/excel">Export Excel</a>
 </div>
 
@@ -88,7 +89,7 @@
       const hash = encodeURIComponent(f.sourceFileHash);
       const tr = document.createElement('tr');
       tr.innerHTML =
-        '<td><a class="link-toollist" href="/ToolListData?hash=' + hash + '">' + esc(f.toolListId || f.sourceFile) + '</a></td>' +
+        '<td><a class="link-toollist" href="/ToolListData?hash=' + hash + '">' + esc(f.sourceFile || f.toolListId) + '</a></td>' +
         '<td>' + esc(f.partNumber) + '</td>' +
         '<td>' + esc(f.operation) + '</td>' +
         '<td>' + esc(f.revision) + '</td>' +
@@ -106,7 +107,7 @@
   function openEdit(f) {
     document.getElementById('editHash').value = f.sourceFileHash;
     document.getElementById('editFileName').textContent = f.sourceFile;
-    document.getElementById('editToolListId').value = f.toolListId || '';
+    document.getElementById('editToolListId').value = f.sourceFile || f.toolListId || '';
     document.getElementById('editPart').value = f.partNumber || '';
     document.getElementById('editOp').value = f.operation || '';
     document.getElementById('editRev').value = f.revision || '';
@@ -142,7 +143,16 @@
     else alert('Delete failed.');
   }
 
+  async function clearAllFiles() {
+    if (!confirm('Delete ALL processed files and their tooling data? This cannot be undone.')) return;
+    const res = await fetch('/api/files/all', { method: 'DELETE' });
+    if (res.ok) await loadFiles();
+    else if (res.status === 404) await loadFiles();
+    else alert('Clear Files failed.');
+  }
+
   document.getElementById('filterBtn').addEventListener('click', loadFiles);
+  document.getElementById('clearFilesBtn').addEventListener('click', clearAllFiles);
   loadFiles();
 })();
 </script>

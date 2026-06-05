@@ -1,5 +1,76 @@
 # Changelog
 
+## [3.9.9] - 2026-06-05
+
+### Fixed
+
+- **Diameter (Ø) and degree (°) symbols** — Python subprocess output is read as UTF-8; tooling text fields are normalised to preserve PDF symbols and repair common mojibake/replacement-character corruption (e.g. `Chamfer Ø8 x 60°`).
+
+## [3.9.8] - 2026-06-05
+
+### Added
+
+- **Clear Files** on Files Processed — deletes all processed PDF tooling data (and saved highlight overlays) in one action.
+
+### Changed
+
+- **ToolListId** — now stores and displays the original PDF filename (e.g. `351-2223-4_OP20_REV04_Tooling (SECO STAMPED).pdf`) instead of parsed PDF header text.
+
+## [3.9.7] - 2026-06-05
+
+### Fixed
+
+- **Remarks column** — Python table extraction no longer overwrites blank Remarks with `[TABLE:…]` metadata; the field now mirrors the source PDF (empty when the PDF cell is empty).
+
+## [3.9.6] - 2026-06-05
+
+### Fixed
+
+- **SECO stamped tooling lists** — PDFs that use numeric tool numbers (`10`, `11`, …) instead of `T01`/`T02` are now parsed correctly. Python validation (`TOOL_NO_PATTERN`), .NET `ParserA` space-delimited rows, and `DigitalPdfExtractor` highlights all accept both formats.
+
+## [3.9.5] - 2026-06-05
+
+### Fixed
+
+- **Build/package warnings** — Pinned `SharpCompress` 0.48.0 and `System.Security.Cryptography.Xml` 10.0.6 to resolve NuGet vulnerability advisories (GHSA-6c8g-7p36-r338, GHSA-37gx-xxp4-5rgx, GHSA-w3x6-4m5h-cxqf).
+- **CA1416 platform warnings** — PDFium and Windows identity calls are guarded with `[SupportedOSPlatform("windows")]` (app targets Windows for Paddle/PDFium).
+- **Paddle stderr noise** — Set `GLOG_minloglevel=2` before native init to suppress deprecated oneDNN API warnings from the bundled Paddle runtime.
+
+## [3.9.4] - 2026-06-05
+
+### Fixed
+
+- **Clear All resets elapsed timer** — Elapsed clock returns to `00:00:00` and is hidden when Clear All is clicked.
+
+## [3.9.3] - 2026-06-05
+
+### Fixed
+
+- **Clear All after Stop** — Clear All is re-enabled immediately when Stop is clicked, without waiting for the job to finish cancelling.
+
+## [3.9.2] - 2026-06-05
+
+### Fixed
+
+- **Stop button** — Always uses primary blue styling and stays clickable; no longer greyed out when idle.
+- **Clear All button** — Primary blue when OCR/extraction is not running; disabled (greyed) only while a job is active.
+
+## [3.9.1] - 2026-06-05
+
+### Fixed
+
+- **Per-file highlight layers** — OCR/table/extracted overlays are now stored separately for each PDF (in-memory and SQLite). Clicking the eye icon loads highlights for that file only, not the last processed file.
+
+## [3.9.0] - 2026-06-05
+
+### Added
+
+- **Stop** button on Extract page — cancels the running extraction job after the current file finishes; preview image and OCR overlays stay on screen.
+- **Clear All** button — clears the imported file list, log, progress, and PDF preview (does not wipe processed tooling records in the database).
+- **Persistent OCR highlight overlays** — normalized highlight rectangles (type, coordinates, colors) are saved to SQLite per file/page after each PDF is processed. Clicking the eye icon reloads overlays from `GET /api/files/highlights`.
+- `POST /api/extraction/{jobId}/stop` — request cancellation of a background extraction job.
+- `JobStatus.Cancelled` for stopped jobs.
+
 ## [3.8.1] - 2026-06-05
 
 ### Fixed

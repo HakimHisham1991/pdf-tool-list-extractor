@@ -1,3 +1,4 @@
+using System.Runtime.Versioning;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using PDFtoImage;
@@ -32,17 +33,11 @@ public class PdfPagePreviewService
         if (!File.Exists(filePath))
             return 0;
 
-        lock (PdfiumGate)
+        if (OperatingSystem.IsWindows())
         {
-            try
-            {
-                using var stream = OpenSharedRead(filePath);
-                return Conversion.GetPageCount(stream, leaveOpen: false);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogDebug(ex, "PDFium page count failed for {File}", filePath);
-            }
+            var pdfiumCount = TryGetPageCountPdfium(filePath);
+            if (pdfiumCount > 0)
+                return pdfiumCount;
         }
 
         try
@@ -66,11 +61,14 @@ public class PdfPagePreviewService
             maxEdgePixels,
             _options.MaxPageRenderPixels > 0 ? _options.MaxPageRenderPixels : maxEdgePixels);
 
-        lock (PdfiumGate)
+        if (OperatingSystem.IsWindows())
         {
-            var pdfium = TryRenderPdfium(filePath, pageNumber, maxPixels);
-            if (pdfium != null)
-                return pdfium;
+            lock (PdfiumGate)
+            {
+                var pdfium = TryRenderPdfium(filePath, pageNumber, maxPixels);
+                if (pdfium != null)
+                    return pdfium;
+            }
         }
 
         try
@@ -97,6 +95,22 @@ public class PdfPagePreviewService
         }
     }
 
+    [SupportedOSPlatform("windows")]
+    private int TryGetPageCountPdfium(string filePath)
+    {
+        try
+        {
+            using var stream = OpenSharedRead(filePath);
+            return Conversion.GetPageCount(stream, leaveOpen: false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "PDFium page count failed for {File}", filePath);
+            return 0;
+        }
+    }
+
+    [SupportedOSPlatform("windows")]
     private byte[]? TryRenderPdfium(string filePath, int pageNumber, int maxEdgePixels)
     {
         try
@@ -135,6 +149,7 @@ public class PdfPagePreviewService
         }
     }
 
+    [SupportedOSPlatform("windows")]
     private int ComputePreviewDpi(string filePath, int pageIndex, int maxEdgePixels)
     {
         try

@@ -10,7 +10,9 @@ namespace ToolingExtractor.Infrastructure.Pdf;
 public class DigitalPdfExtractor : IPdfTextExtractor
 {
     private readonly IExtractionVisualizerNotifier? _visualizer;
-    private static readonly Regex ToolRowRegex = new(@"^\s*T\d{2}\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex ToolRowRegex = new(
+        @"^\s*(?:T\d{2,3}|\d{2})\b",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public DigitalPdfExtractor(IExtractionVisualizerNotifier? visualizer = null)
     {

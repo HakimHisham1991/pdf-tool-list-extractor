@@ -855,7 +855,7 @@
       },
       "Sdcb.PaddleOCR.KnownModels/2.2.1.2": {
         "dependencies": {
-          "SharpCompress": "0.30.1"
+          "SharpCompress": "0.48.0"
         },
         "runtime": {
           "lib/netstandard2.0/Sdcb.PaddleOCR.KnownModels.dll": {
@@ -864,11 +864,11 @@
           }
         }
       },
-      "SharpCompress/0.30.1": {
+      "SharpCompress/0.48.0": {
         "runtime": {
-          "lib/net5.0/SharpCompress.dll": {
-            "assemblyVersion": "0.30.1.0",
-            "fileVersion": "0.30.1.0"
+          "lib/net10.0/SharpCompress.dll": {
+            "assemblyVersion": "0.48.0.0",
+            "fileVersion": "0.48.0.0"
           }
         }
       },
@@ -1347,6 +1347,7 @@
           "Sdcb.PaddleInference.runtime.win64.mkl": "3.3.1.70",
           "Sdcb.PaddleOCR": "3.3.1",
           "Sdcb.PaddleOCR.KnownModels": "2.2.1.2",
+          "SharpCompress": "0.48.0",
           "SkiaSharp": "3.119.2",
           "ToolingExtractor.Core": "1.0.0"
         },
@@ -1680,12 +1681,12 @@
       "path": "sdcb.paddleocr.knownmodels/2.2.1.2",
       "hashPath": "sdcb.paddleocr.knownmodels.2.2.1.2.nupkg.sha512"
     },
-    "SharpCompress/0.30.1": {
+    "SharpCompress/0.48.0": {
       "type": "package",
       "serviceable": true,
-      "sha512": "sha512-XqD4TpfyYGa7QTPzaGlMVbcecKnXy4YmYLDWrU+JIj7IuRNl7DH2END+Ll7ekWIY8o3dAMWLFDE1xdhfIWD1nw==",
-      "path": "sharpcompress/0.30.1",
-      "hashPath": "sharpcompress.0.30.1.nupkg.sha512"
+      "sha512": "sha512-6k0Sa9gf85Sz9Npy7jnn5UPerejrAa3FxU9Gq5T6PwFWHUhUIdF903TjPiJtrYjXFJsXbnccaWSNMHzEg27DwQ==",
+      "path": "sharpcompress/0.48.0",
+      "hashPath": "sharpcompress.0.48.0.nupkg.sha512"
     },
     "SixLabors.Fonts/1.0.0": {
       "type": "package",

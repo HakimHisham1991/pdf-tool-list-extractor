@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "szCxPKrYmq8=",
+  "dgSpecHash": "bAEqOQ+3GAk=",
   "success": true,
   "projectFilePath": "C:\\Users\\Public\\Documents\\pdf-tool-list-extractor\\pdf-tool-list-extractor\\ToolingExtractor\\src\\ToolingExtractor.Web\\ToolingExtractor.Web.csproj",
   "expectedPackageFiles": [
@@ -52,7 +52,7 @@
     "C:\\Users\\hakim.hisham\\.nuget\\packages\\sdcb.paddleinference.runtime.win64.mkl\\3.3.1.70\\sdcb.paddleinference.runtime.win64.mkl.3.3.1.70.nupkg.sha512",
     "C:\\Users\\hakim.hisham\\.nuget\\packages\\sdcb.paddleocr\\3.3.1\\sdcb.paddleocr.3.3.1.nupkg.sha512",
     "C:\\Users\\hakim.hisham\\.nuget\\packages\\sdcb.paddleocr.knownmodels\\2.2.1.2\\sdcb.paddleocr.knownmodels.2.2.1.2.nupkg.sha512",
-    "C:\\Users\\hakim.hisham\\.nuget\\packages\\sharpcompress\\0.30.1\\sharpcompress.0.30.1.nupkg.sha512",
+    "C:\\Users\\hakim.hisham\\.nuget\\packages\\sharpcompress\\0.48.0\\sharpcompress.0.48.0.nupkg.sha512",
     "C:\\Users\\hakim.hisham\\.nuget\\packages\\sixlabors.fonts\\1.0.0\\sixlabors.fonts.1.0.0.nupkg.sha512",
     "C:\\Users\\hakim.hisham\\.nuget\\packages\\skiasharp\\3.119.2\\skiasharp.3.119.2.nupkg.sha512",
     "C:\\Users\\hakim.hisham\\.nuget\\packages\\skiasharp.harfbuzz\\3.119.1\\skiasharp.harfbuzz.3.119.1.nupkg.sha512",
@@ -81,18 +81,5 @@
     "C:\\Users\\hakim.hisham\\.nuget\\packages\\system.windows.extensions\\9.0.0\\system.windows.extensions.9.0.0.nupkg.sha512",
     "C:\\Users\\hakim.hisham\\.nuget\\packages\\yamldotnet\\16.3.0\\yamldotnet.16.3.0.nupkg.sha512"
   ],
-  "logs": [
-    {
-      "code": "NU1902",
-      "level": "Warning",
-      "message": "Package 'SharpCompress' 0.30.1 has a known moderate severity vulnerability, https://github.com/advisories/GHSA-6c8g-7p36-r338",
-      "projectPath": "C:\\Users\\Public\\Documents\\pdf-tool-list-extractor\\pdf-tool-list-extractor\\ToolingExtractor\\src\\ToolingExtractor.Web\\ToolingExtractor.Web.csproj",
-      "warningLevel": 1,
-      "filePath": "C:\\Users\\Public\\Documents\\pdf-tool-list-extractor\\pdf-tool-list-extractor\\ToolingExtractor\\src\\ToolingExtractor.Web\\ToolingExtractor.Web.csproj",
-      "libraryId": "SharpCompress",
-      "targetGraphs": [
-        "net10.0"
-      ]
-    }
-  ]
+  "logs": []
 }

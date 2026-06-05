@@ -63,6 +63,7 @@ builder.Services.AddScoped<ParserFactory>();
 builder.Services.AddScoped<PythonTableExtractionBridge>();
 builder.Services.AddScoped<TemplateAParseService>();
 builder.Services.AddScoped<ExtractionPipelineService>();
+builder.Services.AddScoped<ExtractionHighlightService>();
 builder.Services.AddSingleton<ExtractionVisualizerStore>();
 builder.Services.AddSingleton<IExtractionVisualizerNotifier>(sp =>
     sp.GetRequiredService<ExtractionVisualizerStore>());

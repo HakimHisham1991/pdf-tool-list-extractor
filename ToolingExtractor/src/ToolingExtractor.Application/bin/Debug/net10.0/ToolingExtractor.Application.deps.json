@@ -615,7 +615,7 @@
       },
       "Sdcb.PaddleOCR.KnownModels/2.2.1.2": {
         "dependencies": {
-          "SharpCompress": "0.30.1"
+          "SharpCompress": "0.48.0"
         },
         "runtime": {
           "lib/netstandard2.0/Sdcb.PaddleOCR.KnownModels.dll": {
@@ -624,11 +624,11 @@
           }
         }
       },
-      "SharpCompress/0.30.1": {
+      "SharpCompress/0.48.0": {
         "runtime": {
-          "lib/net5.0/SharpCompress.dll": {
-            "assemblyVersion": "0.30.1.0",
-            "fileVersion": "0.30.1.0"
+          "lib/net10.0/SharpCompress.dll": {
+            "assemblyVersion": "0.48.0.0",
+            "fileVersion": "0.48.0.0"
           }
         }
       },
@@ -924,6 +924,33 @@
           }
         }
       },
+      "System.Security.Cryptography.Pkcs/10.0.6": {
+        "runtime": {
+          "lib/net10.0/System.Security.Cryptography.Pkcs.dll": {
+            "assemblyVersion": "10.0.0.0",
+            "fileVersion": "10.0.626.17701"
+          }
+        },
+        "runtimeTargets": {
+          "runtimes/win/lib/net10.0/System.Security.Cryptography.Pkcs.dll": {
+            "rid": "win",
+            "assetType": "runtime",
+            "assemblyVersion": "10.0.0.0",
+            "fileVersion": "10.0.626.17701"
+          }
+        }
+      },
+      "System.Security.Cryptography.Xml/10.0.6": {
+        "dependencies": {
+          "System.Security.Cryptography.Pkcs": "10.0.6"
+        },
+        "runtime": {
+          "lib/net10.0/System.Security.Cryptography.Xml.dll": {
+            "assemblyVersion": "10.0.0.0",
+            "fileVersion": "10.0.626.17701"
+          }
+        }
+      },
       "YamlDotNet/16.3.0": {
         "runtime": {
           "lib/net8.0/YamlDotNet.dll": {
@@ -955,7 +982,9 @@
           "Sdcb.PaddleInference.runtime.win64.mkl": "3.3.1.70",
           "Sdcb.PaddleOCR": "3.3.1",
           "Sdcb.PaddleOCR.KnownModels": "2.2.1.2",
+          "SharpCompress": "0.48.0",
           "SkiaSharp": "3.119.2",
+          "System.Security.Cryptography.Xml": "10.0.6",
           "ToolingExtractor.Core": "1.0.0"
         },
         "runtime": {
@@ -1274,12 +1303,12 @@
       "path": "sdcb.paddleocr.knownmodels/2.2.1.2",
       "hashPath": "sdcb.paddleocr.knownmodels.2.2.1.2.nupkg.sha512"
     },
-    "SharpCompress/0.30.1": {
+    "SharpCompress/0.48.0": {
       "type": "package",
       "serviceable": true,
-      "sha512": "sha512-XqD4TpfyYGa7QTPzaGlMVbcecKnXy4YmYLDWrU+JIj7IuRNl7DH2END+Ll7ekWIY8o3dAMWLFDE1xdhfIWD1nw==",
-      "path": "sharpcompress/0.30.1",
-      "hashPath": "sharpcompress.0.30.1.nupkg.sha512"
+      "sha512": "sha512-6k0Sa9gf85Sz9Npy7jnn5UPerejrAa3FxU9Gq5T6PwFWHUhUIdF903TjPiJtrYjXFJsXbnccaWSNMHzEg27DwQ==",
+      "path": "sharpcompress/0.48.0",
+      "hashPath": "sharpcompress.0.48.0.nupkg.sha512"
     },
     "SixLabors.Fonts/1.0.0": {
       "type": "package",
@@ -1357,6 +1386,20 @@
       "sha512": "sha512-KYkIOAvPexQOLDxPO2g0BVoWInnQhPpkFzRqvNrNrMhVT6kqhVr0zEb6KCHlptLFukxnZrjuMVAnxK7pOGUYrw==",
       "path": "system.io.packaging/8.0.1",
       "hashPath": "system.io.packaging.8.0.1.nupkg.sha512"
+    },
+    "System.Security.Cryptography.Pkcs/10.0.6": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-88tquaGJ1htm4DHWS6x9jwER7sFET2SVRN7HqO1FYZwE0diDcUmz0ajhVa8ZD2HGhDJBueSPjP/gqyP3gXtT2A==",
+      "path": "system.security.cryptography.pkcs/10.0.6",
+      "hashPath": "system.security.cryptography.pkcs.10.0.6.nupkg.sha512"
+    },
+    "System.Security.Cryptography.Xml/10.0.6": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-71yFkEElPZKZ9jbZQTe1CWeHYXEtnCXwZnHnfeA8pP47tCXBUoWk+6zSIZ7RXO90nZjXgPNil6BFGWb1OBqA5w==",
+      "path": "system.security.cryptography.xml/10.0.6",
+      "hashPath": "system.security.cryptography.xml.10.0.6.nupkg.sha512"
     },
     "YamlDotNet/16.3.0": {
       "type": "package",
