@@ -15,6 +15,8 @@ using ToolingExtractor.Infrastructure.Parsing;
 using ToolingExtractor.Infrastructure.Pdf;
 using ToolingExtractor.Web;
 using ToolingExtractor.Web.Api;
+using ToolingExtractor.Web.Middleware;
+using ToolingExtractor.Web.Services;
 
 PaddleNativeBootstrap.Configure();
 
@@ -69,6 +71,7 @@ builder.Services.AddSingleton<ExtractionJobQueue>();
 builder.Services.AddScoped<FolderScanService>();
 builder.Services.AddScoped<PdfUploadService>();
 builder.Services.AddScoped<DataResetService>();
+builder.Services.AddSingleton<BrowserSessionService>();
 
 builder.Services.Configure<FormOptions>(o =>
 {
@@ -98,7 +101,9 @@ catch (DllNotFoundException ex)
 
 app.UseStaticFiles();
 app.UseRouting();
+app.UseMiddleware<BrowserSessionMiddleware>();
 app.MapRazorPages();
+app.MapSessionApi();
 app.MapExtractionApi();
 
 app.Run();

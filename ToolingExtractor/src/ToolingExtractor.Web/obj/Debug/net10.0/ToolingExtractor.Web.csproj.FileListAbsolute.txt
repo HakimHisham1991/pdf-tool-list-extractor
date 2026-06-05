@@ -259,7 +259,6 @@ C:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\Toolin
 C:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\ToolingExtractor\src\ToolingExtractor.Web\bin\Debug\net10.0\runtimes\win-x64\native\paddle_inference_c.dll
 C:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\ToolingExtractor\src\ToolingExtractor.Web\bin\Debug\net10.0\runtimes\win-x64\native\phi.dll
 C:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\ToolingExtractor\src\ToolingExtractor.Web\obj\Debug\net10.0\ToolingExtractor.Web.sourcelink.json
-C:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\ToolingExtractor\src\ToolingExtractor.Web\obj\Debug\net10.0\compressed\q58bat3uwa-{0}-2ey5s0ggnq-2ey5s0ggnq.gz
 C:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\ToolingExtractor\src\ToolingExtractor.Web\bin\Debug\net10.0\PDFtoImage.dll
 C:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\ToolingExtractor\src\ToolingExtractor.Web\bin\Debug\net10.0\runtimes\linux-arm\native\libpdfium.so
 C:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\ToolingExtractor\src\ToolingExtractor.Web\bin\Debug\net10.0\runtimes\linux-arm64\native\libpdfium.so
@@ -287,3 +286,7 @@ C:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\Toolin
 C:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\ToolingExtractor\src\ToolingExtractor.Web\bin\Debug\net10.0\runtimes\win-arm64\native\libSkiaSharp.pdb
 C:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\ToolingExtractor\src\ToolingExtractor.Web\bin\Debug\net10.0\runtimes\win-x64\native\libSkiaSharp.pdb
 C:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\ToolingExtractor\src\ToolingExtractor.Web\bin\Debug\net10.0\runtimes\win-x86\native\libSkiaSharp.pdb
+C:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\ToolingExtractor\src\ToolingExtractor.Web\bin\Debug\net10.0\data\session-workspaces\c4457ed99af94cb6b5b81077eff70dd8.json
+C:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\ToolingExtractor\src\ToolingExtractor.Web\obj\Debug\net10.0\compressed\gq4yl088s2-{0}-bifes76nlt-bifes76nlt.gz
+c:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\ToolingExtractor\src\ToolingExtractor.Web\obj\Debug\net10.0\compressed\q58bat3uwa-{0}-l4eg38lrb8-l4eg38lrb8.gz
+C:\Users\Public\Documents\pdf-tool-list-extractor\pdf-tool-list-extractor\ToolingExtractor\src\ToolingExtractor.Web\bin\Debug\net10.0\data\session-workspaces\ff40a65500df45babd7c92f87b93fcd0.json

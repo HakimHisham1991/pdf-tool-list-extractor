@@ -41,7 +41,10 @@ public class DigitalPdfExtractor : IPdfTextExtractor
                 .OrderByDescending(g => g.Key)
                 .ToList();
 
-            var highlights = new List<VisualizerHighlight>();
+            var pageBoxes = new List<HighlightBox>();
+            VisualizerHighlightHelper.AddIgnoredBands(pageBoxes);
+
+            var tableBounds = new List<(double L, double B, double R, double T)>();
             foreach (var row in rowGroups)
             {
                 var sorted = row.OrderBy(w => w.BoundingBox.Left).ToList();
@@ -49,13 +52,23 @@ public class DigitalPdfExtractor : IPdfTextExtractor
                 var isToolRow = ToolRowRegex.IsMatch(lineText) ||
                                 lineText.Contains("Tool No", StringComparison.OrdinalIgnoreCase);
 
-                if (isToolRow && highlights.Count < 120)
+                if (isToolRow)
                 {
                     foreach (var w in sorted)
                     {
-                        highlights.Add(VisualizerHighlightHelper.FromPdfWord(
+                        tableBounds.Add((
+                            w.BoundingBox.Left, w.BoundingBox.Bottom,
+                            w.BoundingBox.Right, w.BoundingBox.Top));
+                    }
+                }
+
+                if (pageBoxes.Count(b => b.Type == "ocr") < 400)
+                {
+                    foreach (var w in sorted)
+                    {
+                        pageBoxes.Add(VisualizerHighlightHelper.HighlightFromPdfRect(
                             w.BoundingBox.Left, w.BoundingBox.Bottom, w.BoundingBox.Right, w.BoundingBox.Top,
-                            page.Width, page.Height, w.Text, "digital"));
+                            page.Width, page.Height, w.Text, "ocr", 1f));
                     }
                 }
 
@@ -63,11 +76,23 @@ public class DigitalPdfExtractor : IPdfTextExtractor
                 lines.Add(string.Join("\t", columns.Select(c => string.Join(" ", c.Select(w => w.Text)))));
             }
 
-            if (jobId.HasValue && highlights.Count > 0)
+            if (tableBounds.Count > 0)
             {
+                var minL = tableBounds.Min(b => b.L);
+                var minB = tableBounds.Min(b => b.B);
+                var maxR = tableBounds.Max(b => b.R);
+                var maxT = tableBounds.Max(b => b.T);
+                pageBoxes.Add(VisualizerHighlightHelper.HighlightFromPdfRect(
+                    minL - 4, minB - 4, maxR + 4, maxT + 4,
+                    page.Width, page.Height, "tool table", "table", 1f));
+            }
+
+            if (jobId.HasValue && pageBoxes.Count > 0)
+            {
+                _visualizer?.AddPageHighlights(jobId.Value, pageIndex + 1, pageBoxes);
                 _visualizer?.SetStage(
-                    jobId.Value, "digital", $"Highlighting table cells — page {pageIndex + 1}",
-                    pageIndex, pageCount, (int)page.Width, (int)page.Height, highlights, 0);
+                    jobId.Value, "digital", $"Digital text — {pageBoxes.Count} highlight region(s) on page {pageIndex + 1}",
+                    pageIndex, pageCount, (int)page.Width, (int)page.Height, null, 0);
             }
 
             pageIndex++;

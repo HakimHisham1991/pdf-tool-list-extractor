@@ -17,4 +17,7 @@ public interface IExtractionVisualizerNotifier
         int activeHighlightIndex = -1);
     void EndFile(int jobId);
     void ClearJob(int jobId);
+    void AddPageHighlights(int jobId, int pageNumber, IReadOnlyList<HighlightBox> boxes);
+    void MarkExtractedHighlights(int jobId, IReadOnlyCollection<string> toolNumbers);
+    ExtractionHighlights? GetHighlightsForPage(int jobId, int pageNumber);
 }

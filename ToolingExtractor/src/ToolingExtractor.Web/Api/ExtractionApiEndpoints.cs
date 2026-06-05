@@ -208,6 +208,22 @@ public static class ExtractionApiEndpoints
             return snap == null ? Results.NotFound() : Results.Ok(snap);
         });
 
+        app.MapGet("/api/extraction/{jobId:int}/visualizer/highlights", (int jobId, int? page, ExtractionVisualizerStore store) =>
+        {
+            var snap = store.GetSnapshot(jobId);
+            if (snap == null)
+                return Results.NotFound();
+
+            var pageNum = page ?? snap.PageIndex + 1;
+            if (pageNum < 1)
+                pageNum = 1;
+
+            var highlights = store.GetHighlightsForPage(jobId, pageNum);
+            return highlights == null
+                ? Results.Ok(new ExtractionHighlights { PageNumber = pageNum, PageCount = snap.PageCount })
+                : Results.Ok(highlights);
+        });
+
         app.MapGet("/api/extraction/{jobId:int}/visualizer/preview", (
             int jobId,
             int? page,

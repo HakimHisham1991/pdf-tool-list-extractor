@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "targets": {
     "net10.0": {
       "bblanchon.PDFium.Linux/147.0.7690": {
@@ -3856,7 +3856,7 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\User\\.nuget\\packages\\": {},
+    "C:\\Users\\hakim.hisham\\.nuget\\packages\\": {},
     "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {}
   },
   "project": {
@@ -3865,14 +3865,14 @@
       "projectUniqueName": "C:\\Users\\Public\\Documents\\pdf-tool-list-extractor\\pdf-tool-list-extractor\\ToolingExtractor\\tests\\ToolingExtractor.Infrastructure.Tests\\ToolingExtractor.Infrastructure.Tests.csproj",
       "projectName": "ToolingExtractor.Infrastructure.Tests",
       "projectPath": "C:\\Users\\Public\\Documents\\pdf-tool-list-extractor\\pdf-tool-list-extractor\\ToolingExtractor\\tests\\ToolingExtractor.Infrastructure.Tests\\ToolingExtractor.Infrastructure.Tests.csproj",
-      "packagesPath": "C:\\Users\\User\\.nuget\\packages\\",
+      "packagesPath": "C:\\Users\\hakim.hisham\\.nuget\\packages\\",
       "outputPath": "C:\\Users\\Public\\Documents\\pdf-tool-list-extractor\\pdf-tool-list-extractor\\ToolingExtractor\\tests\\ToolingExtractor.Infrastructure.Tests\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
       ],
       "configFilePaths": [
-        "C:\\Users\\User\\AppData\\Roaming\\NuGet\\NuGet.Config",
+        "C:\\Users\\hakim.hisham\\AppData\\Roaming\\NuGet\\NuGet.Config",
         "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
         "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
       ],
@@ -3881,10 +3881,12 @@
       ],
       "sources": {
         "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+        "C:\\Program Files\\dotnet\\library-packs": {},
         "https://api.nuget.org/v3/index.json": {}
       },
       "frameworks": {
         "net10.0": {
+          "framework": "net10.0",
           "targetAlias": "net10.0",
           "projectReferences": {
             "C:\\Users\\Public\\Documents\\pdf-tool-list-extractor\\pdf-tool-list-extractor\\ToolingExtractor\\src\\ToolingExtractor.Application\\ToolingExtractor.Application.csproj": {
@@ -3909,10 +3911,11 @@
         "auditLevel": "low",
         "auditMode": "all"
       },
-      "SdkAnalysisLevel": "10.0.200"
+      "SdkAnalysisLevel": "10.0.300"
     },
     "frameworks": {
       "net10.0": {
+        "framework": "net10.0",
         "targetAlias": "net10.0",
         "dependencies": {
           "Microsoft.EntityFrameworkCore.Sqlite": {
@@ -3952,7 +3955,7 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.203/PortableRuntimeIdentifierGraph.json",
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.300/PortableRuntimeIdentifierGraph.json",
         "packagesToPrune": {
           "Microsoft.CSharp": "(,4.7.32767]",
           "Microsoft.VisualBasic": "(,10.4.32767]",

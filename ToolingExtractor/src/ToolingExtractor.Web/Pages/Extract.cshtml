@@ -1,526 +1,856 @@
-@page
-@model ToolingExtractor.Web.Pages.ExtractModel
-@{
-    ViewData["Title"] = "Extract";
-}
-
-<h2 class="text-2xl font-semibold mb-4 text-[#00D4FF]">Extract Tooling Data</h2>
-<p class="text-sm text-gray-400 mb-4">
-    Click <strong>Import Files</strong> to multi-select PDFs. Use the <strong>eye icon</strong> in the list to open a full-page preview.
-    Then run <strong>Extract Tooling Data</strong> (existing rows for the same file are replaced).
-</p>
-
-<div class="extract-layout">
-  <div class="extract-main">
-    <div class="flex gap-2 mb-4 flex-wrap items-center">
-      <input id="pdfPicker" type="file" accept=".pdf,application/pdf" multiple class="hidden" />
-      <button id="importBtn" type="button" class="btn btn-secondary">Import Files</button>
-      <button id="startBtn" type="button" class="btn" disabled>Extract Tooling Data</button>
-      <button id="clearAllBtn" type="button" class="btn btn-secondary">Clear All</button>
-      <span id="elapsedWrap" class="hidden ml-2 text-sm text-gray-400">Elapsed: <span id="elapsedTimer" class="extract-timer">00:00:00</span></span>
-    </div>
-
-    <div id="importTableWrap" class="import-table-wrap hidden mb-4">
-      <table class="import-files-table">
-        <thead>
-          <tr>
-            <th class="col-no">No.</th>
-            <th class="col-name">Filename</th>
-            <th class="col-preview">PDF preview</th>
-          </tr>
-        </thead>
-        <tbody id="importTableBody"></tbody>
-      </table>
-    </div>
-
-    <div class="w-full bg-gray-800 rounded h-3 mb-4 overflow-hidden">
-      <div id="progress" class="bg-[#00D4FF] h-3 rounded transition-all duration-300" style="width:0%"></div>
-    </div>
-    <div id="banners" class="mb-4"></div>
-    <div id="log" class="log font-mono text-xs"></div>
-  </div>
-
-  <aside class="pdf-preview-panel" aria-label="PDF file preview">
-    <div class="text-xs text-[#00D4FF] mb-1 font-semibold">PDF preview</div>
-    <div id="previewCaption" class="pdf-viz-stage">Click the eye icon beside a file to preview it here.</div>
-    <div id="previewPageNav" class="pdf-preview-pagenav hidden">
-      <button type="button" id="previewPrevBtn" class="btn btn-secondary btn-sm" disabled aria-label="Previous page">‹</button>
-      <span id="previewPageLabel" class="text-xs text-gray-400">Page 1 / 1</span>
-      <button type="button" id="previewNextBtn" class="btn btn-secondary btn-sm" disabled aria-label="Next page">›</button>
-    </div>
-    <div id="vizViewport" class="pdf-viz-viewport pdf-preview-viewport">
-      <div id="vizPlaceholder" class="pdf-viz-placeholder">No file selected.</div>
-      <img id="vizImage" alt="PDF page preview" class="hidden" />
-    </div>
-  </aside>
-</div>
-
-@section Scripts {
-<script>
-(function () {
-  const logEl = document.getElementById('log');
-  const banners = document.getElementById('banners');
-  const startBtn = document.getElementById('startBtn');
-  const importBtn = document.getElementById('importBtn');
-  const clearAllBtn = document.getElementById('clearAllBtn');
-  const pdfPicker = document.getElementById('pdfPicker');
-  const progressEl = document.getElementById('progress');
-  const importTableWrap = document.getElementById('importTableWrap');
-  const importTableBody = document.getElementById('importTableBody');
-  const elapsedWrap = document.getElementById('elapsedWrap');
-  const elapsedTimer = document.getElementById('elapsedTimer');
-  const previewCaption = document.getElementById('previewCaption');
-  const previewPageNav = document.getElementById('previewPageNav');
-  const previewPageLabel = document.getElementById('previewPageLabel');
-  const previewPrevBtn = document.getElementById('previewPrevBtn');
-  const previewNextBtn = document.getElementById('previewNextBtn');
-  const vizImage = document.getElementById('vizImage');
-  const vizPlaceholder = document.getElementById('vizPlaceholder');
-
-  let pollTimer = null;
-  let elapsedTimerId = null;
-  let extractStartedAt = null;
-  let importFolderPath = '';
-  let importedFiles = [];
-  let previewRelativePath = '';
-  let previewFileName = '';
-  let previewPageIndex = 0;
-  let previewPageCount = 1;
-
-  function pad2(n) { return (n < 10 ? '0' : '') + n; }
-
-  function formatElapsed(ms) {
-    var s = Math.floor(ms / 1000);
-    var h = Math.floor(s / 3600);
-    s -= h * 3600;
-    var m = Math.floor(s / 60);
-    s -= m * 60;
-    return pad2(h) + ':' + pad2(m) + ':' + pad2(s);
-  }
-
-  function startElapsedClock() {
-    extractStartedAt = Date.now();
-    elapsedWrap.classList.remove('hidden');
-    elapsedTimer.textContent = '00:00:00';
-    if (elapsedTimerId) clearInterval(elapsedTimerId);
-    elapsedTimerId = setInterval(function () {
-      if (!extractStartedAt) return;
-      elapsedTimer.textContent = formatElapsed(Date.now() - extractStartedAt);
-    }, 250);
-  }
-
-  function stopElapsedClock() {
-    if (elapsedTimerId) {
-      clearInterval(elapsedTimerId);
-      elapsedTimerId = null;
-    }
-    if (extractStartedAt) {
-      elapsedTimer.textContent = formatElapsed(Date.now() - extractStartedAt);
-      extractStartedAt = null;
-    }
-  }
-
-  function appendLog(line, cls) {
-    var el = document.createElement('div');
-    if (cls) el.className = cls;
-    el.textContent = line;
-    logEl.appendChild(el);
-    logEl.scrollTop = logEl.scrollHeight;
-  }
-
-  function clearImportUi(clearPicker) {
-    importFolderPath = '';
-    importedFiles = [];
-    previewRelativePath = '';
-    previewFileName = '';
-    importTableBody.innerHTML = '';
-    importTableWrap.classList.add('hidden');
-    if (clearPicker) pdfPicker.value = '';
-    setExtractEnabled(false);
-    clearPreviewPanel();
-  }
-
-  function setExtractEnabled(enabled) {
-    startBtn.disabled = !enabled;
-  }
-
-  function setBusy(busy) {
-    startBtn.disabled = busy || importedFiles.length === 0;
-    importBtn.disabled = busy;
-    clearAllBtn.disabled = busy;
-    startBtn.textContent = busy ? 'Extracting…' : 'Extract Tooling Data';
-    importBtn.textContent = busy ? 'Uploading…' : 'Import Files';
-  }
-
-  function clearPreviewPanel() {
-    previewCaption.textContent = 'Click the eye icon beside a file to preview it here.';
-    previewPageNav.classList.add('hidden');
-    vizImage.classList.add('hidden');
-    vizImage.removeAttribute('src');
-    vizPlaceholder.textContent = 'No file selected.';
-    vizPlaceholder.classList.remove('hidden');
-    highlightPreviewRow('');
-  }
-
-  function highlightPreviewRow(relativePath) {
-    var rows = importTableBody.querySelectorAll('tr[data-path]');
-    for (var i = 0; i < rows.length; i++) {
-      rows[i].classList.toggle('import-row-active', rows[i].getAttribute('data-path') === relativePath);
-    }
-  }
-
-  function updatePageNav() {
-    if (previewPageCount <= 1) {
-      previewPageNav.classList.add('hidden');
-      return;
-    }
-    previewPageNav.classList.remove('hidden');
-    previewPageLabel.textContent = 'Page ' + (previewPageIndex + 1) + ' / ' + previewPageCount;
-    previewPrevBtn.disabled = previewPageIndex <= 0;
-    previewNextBtn.disabled = previewPageIndex >= previewPageCount - 1;
-  }
-
-  function loadPreviewImage() {
-    if (!importFolderPath || !previewRelativePath) return;
-
-    vizPlaceholder.textContent = 'Loading preview…';
-    vizPlaceholder.classList.remove('hidden');
-    vizImage.classList.add('hidden');
-
-    var url = '/api/files/preview?folderPath=' + encodeURIComponent(importFolderPath) +
-      '&relativePath=' + encodeURIComponent(previewRelativePath) +
-      '&page=' + (previewPageIndex + 1) + '&_=' + Date.now();
-
-    vizImage.onload = function () {
-      vizPlaceholder.classList.add('hidden');
-      vizImage.classList.remove('hidden');
-    };
-    vizImage.onerror = function () {
-      vizImage.classList.add('hidden');
-      vizPlaceholder.textContent = 'Preview could not be rendered for this PDF.';
-      vizPlaceholder.classList.remove('hidden');
-    };
-    vizImage.src = url;
-  }
-
-  async function showStaticPreview(relativePath, fileName) {
-    if (!importFolderPath) return;
-
-    previewRelativePath = relativePath;
-    previewFileName = fileName || relativePath;
-    previewPageIndex = 0;
-    previewPageCount = 1;
-
-    highlightPreviewRow(relativePath);
-    previewCaption.textContent = previewFileName;
-
-    try {
-      var metaUrl = '/api/files/preview/meta?folderPath=' + encodeURIComponent(importFolderPath) +
-        '&relativePath=' + encodeURIComponent(relativePath);
-      var metaRes = await fetch(metaUrl);
-      if (metaRes.ok) {
-        var meta = await metaRes.json();
-        previewPageCount = Math.max(1, meta.pageCount || 1);
-      }
-    } catch (e) { /* use single page */ }
-
-    updatePageNav();
-    loadPreviewImage();
-  }
-
-  previewPrevBtn.addEventListener('click', function () {
-    if (previewPageIndex <= 0) return;
-    previewPageIndex--;
-    updatePageNav();
-    loadPreviewImage();
-  });
-
-  previewNextBtn.addEventListener('click', function () {
-    if (previewPageIndex >= previewPageCount - 1) return;
-    previewPageIndex++;
-    updatePageNav();
-    loadPreviewImage();
-  });
-
-  function renderImportedTable(files) {
-    importedFiles = files.map(function (f) {
-      return { relativePath: f.relativePath, fileName: f.fileName || f.relativePath };
-    });
-    importTableBody.innerHTML = '';
-
-    for (var i = 0; i < importedFiles.length; i++) {
-      var f = importedFiles[i];
-      var tr = document.createElement('tr');
-      tr.setAttribute('data-path', f.relativePath);
-
-      var tdNo = document.createElement('td');
-      tdNo.className = 'col-no';
-      tdNo.textContent = String(i + 1);
-
-      var tdName = document.createElement('td');
-      tdName.className = 'col-name';
-      tdName.textContent = f.fileName;
-      tdName.title = f.fileName;
-
-      var tdPreview = document.createElement('td');
-      tdPreview.className = 'col-preview';
-      var btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'btn-preview-eye';
-      btn.title = 'Preview ' + f.fileName;
-      btn.setAttribute('aria-label', 'Preview ' + f.fileName);
-      btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
-      (function (rel, name) {
-        btn.addEventListener('click', function () { showStaticPreview(rel, name); });
-      })(f.relativePath, f.fileName);
-      tdPreview.appendChild(btn);
-
-      tr.appendChild(tdNo);
-      tr.appendChild(tdName);
-      tr.appendChild(tdPreview);
-      importTableBody.appendChild(tr);
-    }
-
-    importTableWrap.classList.toggle('hidden', importedFiles.length === 0);
-    setExtractEnabled(importedFiles.length > 0);
-
-    if (importedFiles.length === 1) {
-      showStaticPreview(importedFiles[0].relativePath, importedFiles[0].fileName);
-    }
-  }
-
-  function statusLabel(status) {
-    var names = ['Pending', 'Running', 'Completed', 'Failed'];
-    if (typeof status === 'string') return status;
-    return names[status] ?? String(status);
-  }
-
-  function isTerminal(status) {
-    return status === 2 || status === 3 || status === 'Completed' || status === 'Failed';
-  }
-
-  async function pollStatus(jobId) {
-    var res = await fetch('/api/extraction/status/' + jobId);
-    if (!res.ok) {
-      appendLog('Could not read job status (HTTP ' + res.status + ')', 'text-red-400');
-      return null;
-    }
-    return await res.json();
-  }
-
-  function stopPolling() {
-    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
-    stopElapsedClock();
-  }
-
-  clearAllBtn.addEventListener('click', async function () {
-    if (!confirm('Clear all extracted data, uploads, and import list? This starts a new session.'))
-      return;
-
-    stopPolling();
-    clearAllBtn.disabled = true;
-    appendLog('Clearing database and logs…');
-
-    try {
-      var res = await fetch('/api/data/reset', { method: 'POST' });
-      if (!res.ok) {
-        appendLog('Clear All failed (HTTP ' + res.status + ').', 'text-red-400');
-        return;
-      }
-
-      sessionStorage.removeItem('te-session');
-      window.__dataResetPromise = null;
-      logEl.innerHTML = '';
-      banners.innerHTML = '';
-      progressEl.style.width = '0%';
-      clearImportUi(true);
-      clearPreviewPanel();
-      elapsedWrap.classList.add('hidden');
-      appendLog('All data cleared. Import files to begin a new session.', 'text-[#00D4FF]');
-    } catch (err) {
-      appendLog('Clear All error: ' + err.message, 'text-red-400');
-    } finally {
-      clearAllBtn.disabled = false;
-      setBusy(false);
-    }
-  });
-
-  importBtn.addEventListener('click', function () {
-    pdfPicker.click();
-  });
-
-  pdfPicker.addEventListener('change', async function () {
-    var selected = Array.from(pdfPicker.files || []);
-    if (selected.length === 0)
-      return;
-
-    stopPolling();
-    banners.innerHTML = '';
-    progressEl.style.width = '0%';
-    clearImportUi(false);
-    logEl.innerHTML = '';
-    clearPreviewPanel();
-
-    setBusy(true);
-    appendLog('Uploading ' + selected.length + ' PDF file(s)…');
-
-    var formData = new FormData();
-    for (var i = 0; i < selected.length; i++) {
-      formData.append('files', selected[i]);
-    }
-
-    try {
-      await window.waitForDataReset();
-      var res = await fetch('/api/files/import', {
-        method: 'POST',
-        body: formData
-      });
-
-      var body = {};
-      try { body = await res.json(); } catch { /* non-json */ }
-
-      if (!res.ok) {
-        appendLog(body.error || ('Import failed (HTTP ' + res.status + ')'), 'text-red-400');
-        return;
-      }
-
-      importFolderPath = body.folderPath || '';
-      var files = body.files || [];
-      if (files.length === 0) {
-        appendLog('No PDF files were imported.', 'text-yellow-400');
-        return;
-      }
-
-      renderImportedTable(files);
-      appendLog('Imported ' + files.length + ' PDF(s). Preview with the eye icon, then click Extract Tooling Data.');
-    } catch (err) {
-      appendLog('Import error: ' + err.message, 'text-red-400');
-    } finally {
-      pdfPicker.value = '';
-      setBusy(false);
-    }
-  });
-
-  startBtn.addEventListener('click', async function () {
-    if (!importFolderPath || importedFiles.length === 0) {
-      appendLog('Import files first.', 'text-red-400');
-      return;
-    }
-
-    var relativePaths = importedFiles.map(function (f) { return f.relativePath; });
-
-    stopPolling();
-    banners.innerHTML = '';
-    progressEl.style.width = '0%';
-
-    setBusy(true);
-    startElapsedClock();
-    appendLog('Starting extraction for ' + relativePaths.length + ' imported PDF(s) (replacing any existing rows)…');
-
-    try {
-      var res = await fetch('/api/extraction/start', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({
-          folderPath: importFolderPath,
-          filePaths: relativePaths
-        })
-      });
-
-      var body = {};
-      try { body = await res.json(); } catch { /* non-json */ }
-
-      if (!res.ok) {
-        appendLog(body.error || ('Request failed (HTTP ' + res.status + ')'), 'text-red-400');
-        setBusy(false);
-        stopElapsedClock();
-        return;
-      }
-
-      var jobId = body.jobId;
-      if (!jobId) {
-        appendLog('Server did not return a job id.', 'text-red-400');
-        setBusy(false);
-        stopElapsedClock();
-        return;
-      }
-
-      appendLog('Job #' + jobId + ' queued. Processing PDFs (OCR may take several minutes per file)…');
-      var statusDiv = document.createElement('div');
-      statusDiv.id = 'statusLine';
-      statusDiv.className = 'text-[#00D4FF] mt-2';
-      logEl.appendChild(statusDiv);
-
-      pollTimer = setInterval(async function () {
-        try {
-          var st = await pollStatus(jobId);
-          if (!st) return;
-
-          var total = Math.max(st.totalFiles || 0, 1);
-          var done = (st.processedFiles || 0) + (st.skippedFiles || 0) + (st.failedFiles || 0);
-          var pct = st.totalFiles > 0 ? Math.min(100, Math.round((done / total) * 100)) : (st.status === 1 ? 5 : 0);
-          progressEl.style.width = pct + '%';
-
-          var statusLine = document.getElementById('statusLine');
-          if (statusLine && (st.status === 0 || st.status === 1 || st.status === 'Pending' || st.status === 'Running')) {
-            statusLine.textContent = 'Status: ' + statusLabel(st.status) + ' — ' + done + '/' + st.totalFiles +
-              ' files (processed ' + st.processedFiles + ', skipped ' + st.skippedFiles + ', failed ' + st.failedFiles + ')';
-          }
-
-          if (isTerminal(st.status)) {
-            clearInterval(pollTimer);
-            pollTimer = null;
-            stopElapsedClock();
-            progressEl.style.width = '100%';
-            setBusy(false);
-
-            if (st.status === 3 || st.status === 'Failed') {
-              appendLog('Extraction failed: ' + (st.errorSummary || 'Unknown error'), 'text-red-400');
-              return;
-            }
-
-            if (st.totalFiles === 0) {
-              appendLog('No PDF files were processed.', 'text-yellow-400');
-              return;
-            }
-
-            appendLog('Done: ' + st.processedFiles + ' processed, ' + st.skippedFiles + ' skipped, ' +
-              st.failedFiles + ' failed, ' + st.amendedFilesDetected + ' amended.');
-
-            if (st.failedFiles > 0) {
-              appendLog(
-                'Failed file(s): text did not match tooling templates A/B/C, or processing timed out. ' +
-                'See failed_extractions/*.txt next to the app (raw OCR text + reason).',
-                'text-yellow-400');
-            }
-
-            if (st.processedFiles > 0) {
-              banners.innerHTML =
-                '<div class="banner-amber" style="border-color:#00D4FF;color:#00D4FF">' +
-                'Extraction complete — <a class="underline" href="/FilesProcessed">View Files Processed</a> ' +
-                'or <a class="underline" href="/ExportAll">Export All</a>.</div>';
-            }
-
-            if (st.amendedFilesDetected > 0) {
-              banners.innerHTML += '<div class="banner-amber mt-2">⚠ ' + st.amendedFilesDetected +
-                ' file(s) were PDF-amended — check the Review Required sheet in the Excel export.</div>';
-            }
-          }
-        } catch (err) {
-          stopPolling();
-          setBusy(false);
-          appendLog('Polling error: ' + err.message, 'text-red-400');
-        }
-      }, 2000);
-
-      await pollStatus(jobId);
-    } catch (err) {
-      appendLog('Error: ' + err.message, 'text-red-400');
-      setBusy(false);
-      stopElapsedClock();
-    }
-  });
-})();
-</script>
-}
-
+@page
+@model ToolingExtractor.Web.Pages.ExtractModel
+@{
+    ViewData["Title"] = "Extract";
+}
+
+<h2 class="page-title mb-4">Extract Tooling Data</h2>
+<p class="text-sm text-muted mb-4">
+    Click <strong>Import Files</strong> to multi-select PDFs. Use the <strong>eye icon</strong> in the list to open a full-page preview.
+    Then run <strong>Extract Tooling Data</strong> (existing rows for the same file are replaced).
+</p>
+
+<div class="extract-layout">
+  <div class="extract-main">
+    <div class="flex gap-2 mb-4 flex-wrap items-center">
+      <input id="pdfPicker" type="file" accept=".pdf,application/pdf" multiple class="hidden" />
+      <button id="importBtn" type="button" class="btn">Import Files</button>
+      <button id="startBtn" type="button" class="btn" disabled>Extract Tooling Data</button>
+      <span id="elapsedWrap" class="hidden ml-2 text-sm text-muted">Elapsed: <span id="elapsedTimer" class="extract-timer">00:00:00</span></span>
+    </div>
+
+    <div id="importTableWrap" class="import-table-wrap hidden mb-4">
+      <table class="import-files-table">
+        <thead>
+          <tr>
+            <th class="col-no">No.</th>
+            <th class="col-name">Filename</th>
+            <th class="col-preview">PDF preview</th>
+          </tr>
+        </thead>
+        <tbody id="importTableBody"></tbody>
+      </table>
+    </div>
+
+    <div class="pdf-preview-panel" aria-label="PDF file preview">
+      <div class="text-xs text-accent mb-1 font-semibold">PDF preview</div>
+      <div id="previewCaption" class="pdf-viz-stage">Click the eye icon beside a file to preview it here.</div>
+      <div id="previewPageNav" class="pdf-preview-pagenav hidden">
+        <button type="button" id="previewPrevBtn" class="btn btn-secondary btn-sm" disabled aria-label="Previous page">‹</button>
+        <span id="previewPageLabel" class="text-xs text-muted">Page 1 / 1</span>
+        <button type="button" id="previewNextBtn" class="btn btn-secondary btn-sm" disabled aria-label="Next page">›</button>
+        <button type="button" id="resetLayersBtn" class="btn btn-secondary btn-sm ml-auto" title="Show all highlight layers">Reset View</button>
+      </div>
+      <div id="vizViewport" class="pdf-viz-viewport pdf-preview-viewport">
+        <div id="vizPlaceholder" class="pdf-viz-placeholder">No file selected.</div>
+        <div id="vizImageWrap" class="pdf-preview-wrapper hidden">
+          <img id="vizImage" alt="PDF page preview" />
+          <canvas id="highlightCanvas" aria-hidden="true"></canvas>
+        </div>
+      </div>
+      <div id="layerControls" class="layer-controls hidden">
+        <h6 class="layer-controls-title">Highlight Layers</h6>
+        <label><input type="checkbox" id="toggle-ocr" checked> <span class="layer-swatch layer-swatch-ocr">Blue</span> OCR Text (50%)</label>
+        <label><input type="checkbox" id="toggle-table" checked> <span class="layer-swatch layer-swatch-table">Gray</span> Table Borders (30%)</label>
+        <label><input type="checkbox" id="toggle-extracted" checked> <span class="layer-swatch layer-swatch-extracted">Green</span> Extracted Tool Data (50%)</label>
+        <label><input type="checkbox" id="toggle-lowconf" checked> <span class="layer-swatch layer-swatch-lowconf">Red</span> Low Confidence OCR (50%)</label>
+        <label><input type="checkbox" id="toggle-ignored" checked> <span class="layer-swatch layer-swatch-ignored">Yellow</span> Ignored Content (20%)</label>
+      </div>
+    </div>
+
+    <div class="progress-track">
+      <div id="progress" class="progress-bar" style="width:0%"></div>
+    </div>
+    <div id="banners" class="mb-4"></div>
+    <div id="log" class="log font-mono text-xs"></div>
+  </div>
+</div>
+
+@section Scripts {
+<script>
+(function () {
+  const logEl = document.getElementById('log');
+  const banners = document.getElementById('banners');
+  const startBtn = document.getElementById('startBtn');
+  const importBtn = document.getElementById('importBtn');
+  const pdfPicker = document.getElementById('pdfPicker');
+  const progressEl = document.getElementById('progress');
+  const importTableWrap = document.getElementById('importTableWrap');
+  const importTableBody = document.getElementById('importTableBody');
+  const elapsedWrap = document.getElementById('elapsedWrap');
+  const elapsedTimer = document.getElementById('elapsedTimer');
+  const previewCaption = document.getElementById('previewCaption');
+  const previewPageNav = document.getElementById('previewPageNav');
+  const previewPageLabel = document.getElementById('previewPageLabel');
+  const previewPrevBtn = document.getElementById('previewPrevBtn');
+  const previewNextBtn = document.getElementById('previewNextBtn');
+  const resetLayersBtn = document.getElementById('resetLayersBtn');
+  const vizImage = document.getElementById('vizImage');
+  const vizImageWrap = document.getElementById('vizImageWrap');
+  const highlightCanvas = document.getElementById('highlightCanvas');
+  const layerControls = document.getElementById('layerControls');
+  const vizPlaceholder = document.getElementById('vizPlaceholder');
+
+  let pollTimer = null;
+  let vizPollTimer = null;
+  let elapsedTimerId = null;
+  let extractStartedAt = null;
+  let importFolderPath = '';
+  let importedFiles = [];
+  let previewRelativePath = '';
+  let previewFileName = '';
+  let previewPageIndex = 0;
+  let previewPageCount = 1;
+  let activeJobId = null;
+  let extractionPreviewMode = false;
+  let currentHighlights = null;
+  let lastLoadedPreviewKey = '';
+  let lastSnapUpdatedAt = '';
+  let lastStaticPreviewUrl = '';
+
+  const layerVisibility = {
+    ocr: true,
+    table: true,
+    extracted: true,
+    lowconf: true,
+    ignored: true
+  };
+
+  var WORKSPACE_KEY = 'te-extract-workspace';
+
+  function saveWorkspace() {
+    var payload = JSON.stringify({
+      importFolderPath: importFolderPath,
+      importedFiles: importedFiles,
+      previewRelativePath: previewRelativePath,
+      previewFileName: previewFileName,
+      previewPageIndex: previewPageIndex,
+      previewPageCount: previewPageCount,
+      extractionPreviewMode: extractionPreviewMode,
+      activeJobId: activeJobId,
+      progressPct: progressEl.style.width || '0%',
+      bannersHtml: banners.innerHTML,
+      logHtml: logEl.innerHTML,
+      layerVisibility: layerVisibility
+    });
+
+    try { sessionStorage.setItem(WORKSPACE_KEY, payload); } catch (e) { /* ignore */ }
+
+    var headers = window.teTabHeaders ? window.teTabHeaders() : { 'Content-Type': 'application/json' };
+    fetch('/api/session/workspace', {
+      method: 'POST',
+      headers: headers,
+      credentials: 'include',
+      keepalive: true,
+      body: payload
+    }).catch(function () { /* ignore */ });
+  }
+
+  function applyWorkspace(ws) {
+    if (!ws || !ws.importFolderPath || !ws.importedFiles || !ws.importedFiles.length) return;
+
+    importFolderPath = ws.importFolderPath;
+    renderImportedTable(ws.importedFiles, true);
+
+    if (ws.layerVisibility) {
+      Object.keys(layerVisibility).forEach(function (k) {
+        if (typeof ws.layerVisibility[k] === 'boolean') layerVisibility[k] = ws.layerVisibility[k];
+      });
+      document.querySelectorAll('.layer-controls input[type=checkbox]').forEach(function (cb) {
+        var type = cb.id.replace('toggle-', '');
+        if (typeof layerVisibility[type] === 'boolean') cb.checked = layerVisibility[type];
+      });
+    }
+
+    if (ws.logHtml) logEl.innerHTML = ws.logHtml;
+    if (ws.bannersHtml) banners.innerHTML = ws.bannersHtml;
+    if (ws.progressPct) progressEl.style.width = ws.progressPct;
+
+    if (ws.previewRelativePath) {
+      previewRelativePath = ws.previewRelativePath;
+      previewFileName = ws.previewFileName || ws.previewRelativePath;
+      previewPageIndex = ws.previewPageIndex || 0;
+      previewPageCount = ws.previewPageCount || 1;
+      highlightPreviewRow(previewRelativePath);
+      previewCaption.textContent = previewFileName;
+      updatePageNav();
+
+      if (ws.extractionPreviewMode && ws.activeJobId) {
+        activeJobId = ws.activeJobId;
+        extractionPreviewMode = true;
+        layerControls.classList.remove('hidden');
+        lastLoadedPreviewKey = '';
+        loadExtractionPreviewImage(true);
+        pollVisualizer(ws.activeJobId);
+      } else {
+        loadPreviewImage();
+      }
+    } else if (importedFiles.length === 1) {
+      showStaticPreview(importedFiles[0].relativePath, importedFiles[0].fileName);
+    }
+  }
+
+  async function restoreWorkspace() {
+    await window.waitForDataReset();
+
+    try {
+      var raw = sessionStorage.getItem(WORKSPACE_KEY);
+      if (raw) {
+        applyWorkspace(JSON.parse(raw));
+        return;
+      }
+    } catch (e) { /* ignore */ }
+
+    try {
+      var headers = window.teTabHeaders ? window.teTabHeaders() : {};
+      var res = await fetch('/api/session/workspace', { credentials: 'include', headers: headers });
+      if (res.ok && res.status !== 204) {
+        var ws = await res.json();
+        applyWorkspace(ws);
+        try { sessionStorage.setItem(WORKSPACE_KEY, JSON.stringify(ws)); } catch (e) { /* ignore */ }
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+
+  function formatElapsed(ms) {
+    var s = Math.floor(ms / 1000);
+    var h = Math.floor(s / 3600);
+    s -= h * 3600;
+    var m = Math.floor(s / 60);
+    s -= m * 60;
+    return pad2(h) + ':' + pad2(m) + ':' + pad2(s);
+  }
+
+  function startElapsedClock() {
+    extractStartedAt = Date.now();
+    elapsedWrap.classList.remove('hidden');
+    elapsedTimer.textContent = '00:00:00';
+    if (elapsedTimerId) clearInterval(elapsedTimerId);
+    elapsedTimerId = setInterval(function () {
+      if (!extractStartedAt) return;
+      elapsedTimer.textContent = formatElapsed(Date.now() - extractStartedAt);
+    }, 250);
+  }
+
+  function stopElapsedClock() {
+    if (elapsedTimerId) {
+      clearInterval(elapsedTimerId);
+      elapsedTimerId = null;
+    }
+    if (extractStartedAt) {
+      elapsedTimer.textContent = formatElapsed(Date.now() - extractStartedAt);
+      extractStartedAt = null;
+    }
+  }
+
+  function appendLog(line, cls) {
+    var el = document.createElement('div');
+    if (cls) el.className = cls;
+    el.textContent = line;
+    logEl.appendChild(el);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function clearImportUi(clearPicker) {
+    importFolderPath = '';
+    importedFiles = [];
+    previewRelativePath = '';
+    previewFileName = '';
+    importTableBody.innerHTML = '';
+    importTableWrap.classList.add('hidden');
+    if (clearPicker) pdfPicker.value = '';
+    setExtractEnabled(false);
+    clearPreviewPanel();
+  }
+
+  function setExtractEnabled(enabled) {
+    startBtn.disabled = !enabled;
+  }
+
+  function setExtractBusy(busy) {
+    startBtn.disabled = busy || importedFiles.length === 0;
+    startBtn.textContent = busy ? 'Extracting…' : 'Extract Tooling Data';
+  }
+
+  function clearPreviewPanel() {
+    previewCaption.textContent = 'Click the eye icon beside a file to preview it here.';
+    previewPageNav.classList.add('hidden');
+    layerControls.classList.add('hidden');
+    vizImageWrap.classList.add('hidden');
+    vizImage.removeAttribute('src');
+    vizPlaceholder.textContent = 'No file selected.';
+    vizPlaceholder.classList.remove('hidden');
+    currentHighlights = null;
+    clearHighlightCanvas();
+    highlightPreviewRow('');
+    extractionPreviewMode = false;
+    activeJobId = null;
+    lastLoadedPreviewKey = '';
+    lastSnapUpdatedAt = '';
+    lastStaticPreviewUrl = '';
+  }
+
+  function clearHighlightCanvas() {
+    if (!highlightCanvas) return;
+    var ctx = highlightCanvas.getContext('2d');
+    if (ctx) ctx.clearRect(0, 0, highlightCanvas.width, highlightCanvas.height);
+  }
+
+  function redrawHighlights() {
+    if (!highlightCanvas || !vizImage || vizImageWrap.classList.contains('hidden')) return;
+
+    highlightCanvas.width = vizImage.clientWidth;
+    highlightCanvas.height = vizImage.clientHeight;
+
+    var ctx = highlightCanvas.getContext('2d');
+    ctx.clearRect(0, 0, highlightCanvas.width, highlightCanvas.height);
+
+    var scaleX = highlightCanvas.width;
+    var scaleY = highlightCanvas.height;
+
+    (currentHighlights && currentHighlights.boxes ? currentHighlights.boxes : []).forEach(function (box) {
+      if (!layerVisibility[box.type]) return;
+
+      var x = box.x * scaleX;
+      var y = box.y * scaleY;
+      var w = box.width * scaleX;
+      var h = box.height * scaleY;
+
+      var fillStyle = 'rgba(0,0,0,0)';
+      var strokeStyle = 'rgba(0,0,0,0.6)';
+
+      switch (box.type) {
+        case 'ocr':
+          fillStyle = 'rgba(0, 100, 255, 0.5)';
+          strokeStyle = 'rgba(0, 80, 200, 0.8)';
+          break;
+        case 'table':
+          fillStyle = 'rgba(100, 100, 100, 0.3)';
+          strokeStyle = 'rgba(70, 70, 70, 0.7)';
+          break;
+        case 'extracted':
+          fillStyle = 'rgba(0, 200, 100, 0.5)';
+          strokeStyle = 'rgba(0, 160, 80, 0.9)';
+          break;
+        case 'lowconf':
+          fillStyle = 'rgba(255, 60, 60, 0.5)';
+          strokeStyle = 'rgba(200, 30, 30, 0.8)';
+          break;
+        case 'ignored':
+          fillStyle = 'rgba(255, 220, 60, 0.2)';
+          strokeStyle = 'rgba(230, 180, 30, 0.5)';
+          break;
+      }
+
+      ctx.fillStyle = fillStyle;
+      ctx.strokeStyle = strokeStyle;
+      ctx.lineWidth = 1.5;
+      ctx.fillRect(x, y, w, h);
+      ctx.strokeRect(x, y, w, h);
+    });
+  }
+
+  async function loadHighlights(jobId, page) {
+    if (!jobId) return;
+    try {
+      var res = await fetch('/api/extraction/' + jobId + '/visualizer/highlights?page=' + page);
+      if (!res.ok) return;
+      currentHighlights = await res.json();
+      redrawHighlights();
+    } catch (e) { /* ignore */ }
+  }
+
+  function resetLayerToggles() {
+    layerVisibility.ocr = true;
+    layerVisibility.table = true;
+    layerVisibility.extracted = true;
+    layerVisibility.lowconf = true;
+    layerVisibility.ignored = true;
+    document.querySelectorAll('.layer-controls input[type=checkbox]').forEach(function (cb) {
+      cb.checked = true;
+    });
+    redrawHighlights();
+  }
+
+  function highlightPreviewRow(relativePath) {
+    var rows = importTableBody.querySelectorAll('tr[data-path]');
+    for (var i = 0; i < rows.length; i++) {
+      rows[i].classList.toggle('import-row-active', rows[i].getAttribute('data-path') === relativePath);
+    }
+  }
+
+  function updatePageNav() {
+    if (previewPageCount <= 1) {
+      previewPageNav.classList.add('hidden');
+      return;
+    }
+    previewPageNav.classList.remove('hidden');
+    previewPageLabel.textContent = 'Page ' + (previewPageIndex + 1) + ' / ' + previewPageCount;
+    previewPrevBtn.disabled = previewPageIndex <= 0;
+    previewNextBtn.disabled = previewPageIndex >= previewPageCount - 1;
+  }
+
+  function loadPreviewImage() {
+    if (extractionPreviewMode) {
+      loadExtractionPreviewImage(true);
+      return;
+    }
+    if (!importFolderPath || !previewRelativePath) return;
+
+    var url = '/api/files/preview?folderPath=' + encodeURIComponent(importFolderPath) +
+      '&relativePath=' + encodeURIComponent(previewRelativePath) +
+      '&page=' + (previewPageIndex + 1);
+
+    if (url === lastStaticPreviewUrl && !vizImageWrap.classList.contains('hidden')) {
+      redrawHighlights();
+      return;
+    }
+
+    lastStaticPreviewUrl = url;
+    vizPlaceholder.textContent = 'Loading preview…';
+    vizPlaceholder.classList.remove('hidden');
+    vizImageWrap.classList.add('hidden');
+    layerControls.classList.add('hidden');
+
+    vizImage.onload = function () {
+      vizPlaceholder.classList.add('hidden');
+      vizImageWrap.classList.remove('hidden');
+      redrawHighlights();
+    };
+    vizImage.onerror = function () {
+      vizImageWrap.classList.add('hidden');
+      vizPlaceholder.textContent = 'Preview could not be rendered for this PDF.';
+      vizPlaceholder.classList.remove('hidden');
+    };
+    vizImage.src = url;
+  }
+
+  function loadExtractionPreviewImage(forceReload) {
+    if (!activeJobId) return;
+
+    var page = previewPageIndex + 1;
+    var previewKey = activeJobId + ':' + page;
+    var url = '/api/extraction/' + activeJobId + '/visualizer/preview?page=' + page;
+
+    if (!forceReload && previewKey === lastLoadedPreviewKey && !vizImageWrap.classList.contains('hidden')) {
+      return;
+    }
+
+    var pageChanged = previewKey !== lastLoadedPreviewKey;
+    lastLoadedPreviewKey = previewKey;
+
+    if (pageChanged || vizImageWrap.classList.contains('hidden')) {
+      vizPlaceholder.textContent = 'Loading preview…';
+      vizPlaceholder.classList.remove('hidden');
+      vizImageWrap.classList.add('hidden');
+    }
+
+    vizImage.onload = function () {
+      vizPlaceholder.classList.add('hidden');
+      vizImageWrap.classList.remove('hidden');
+      layerControls.classList.remove('hidden');
+      loadHighlights(activeJobId, page);
+    };
+    vizImage.onerror = function () {
+      vizImageWrap.classList.add('hidden');
+      vizPlaceholder.textContent = 'Preview could not be rendered for this PDF.';
+      vizPlaceholder.classList.remove('hidden');
+    };
+
+    if (pageChanged || !vizImage.src || vizImage.src.indexOf(url) === -1) {
+      vizImage.src = url;
+    } else {
+      loadHighlights(activeJobId, page);
+    }
+  }
+
+  async function pollVisualizer(jobId) {
+    try {
+      var res = await fetch('/api/extraction/' + jobId + '/visualizer');
+      if (!res.ok) return;
+
+      var snap = await res.json();
+      previewCaption.textContent = (snap.fileName || 'PDF') + ' — ' + (snap.message || snap.stage || 'Processing…');
+      previewPageCount = Math.max(1, snap.pageCount || 1);
+
+      if (typeof snap.pageIndex === 'number' && snap.pageIndex >= 0 && !previewPageNav.dataset.userNav) {
+        if (snap.pageIndex !== previewPageIndex) {
+          previewPageIndex = snap.pageIndex;
+          lastLoadedPreviewKey = '';
+        }
+      }
+
+      updatePageNav();
+
+      var previewKey = jobId + ':' + (previewPageIndex + 1);
+      if (previewKey !== lastLoadedPreviewKey || vizImageWrap.classList.contains('hidden')) {
+        loadExtractionPreviewImage(true);
+      } else if (snap.updatedAtUtc && snap.updatedAtUtc !== lastSnapUpdatedAt) {
+        lastSnapUpdatedAt = snap.updatedAtUtc;
+        await loadHighlights(jobId, previewPageIndex + 1);
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  function startVisualizerPolling(jobId) {
+    stopVisualizerPolling();
+    activeJobId = jobId;
+    extractionPreviewMode = true;
+    lastLoadedPreviewKey = '';
+    lastSnapUpdatedAt = '';
+    layerControls.classList.remove('hidden');
+    previewPageNav.dataset.userNav = '';
+    pollVisualizer(jobId);
+    vizPollTimer = setInterval(function () { pollVisualizer(jobId); }, 2000);
+  }
+
+  function stopVisualizerPolling() {
+    if (vizPollTimer) {
+      clearInterval(vizPollTimer);
+      vizPollTimer = null;
+    }
+  }
+
+  async function showStaticPreview(relativePath, fileName) {
+    if (!importFolderPath) return;
+
+    stopVisualizerPolling();
+    extractionPreviewMode = false;
+    activeJobId = null;
+    lastLoadedPreviewKey = '';
+    lastSnapUpdatedAt = '';
+    lastStaticPreviewUrl = '';
+    layerControls.classList.add('hidden');
+    currentHighlights = null;
+
+    previewRelativePath = relativePath;
+    previewFileName = fileName || relativePath;
+    previewPageIndex = 0;
+    previewPageCount = 1;
+
+    highlightPreviewRow(relativePath);
+    previewCaption.textContent = previewFileName;
+
+    try {
+      var metaUrl = '/api/files/preview/meta?folderPath=' + encodeURIComponent(importFolderPath) +
+        '&relativePath=' + encodeURIComponent(relativePath);
+      var metaRes = await fetch(metaUrl);
+      if (metaRes.ok) {
+        var meta = await metaRes.json();
+        previewPageCount = Math.max(1, meta.pageCount || 1);
+      }
+    } catch (e) { /* use single page */ }
+
+    updatePageNav();
+    loadPreviewImage();
+    saveWorkspace();
+  }
+
+  previewPrevBtn.addEventListener('click', function () {
+    if (previewPageIndex <= 0) return;
+    previewPageIndex--;
+    previewPageNav.dataset.userNav = '1';
+    lastLoadedPreviewKey = '';
+    updatePageNav();
+    loadPreviewImage();
+    saveWorkspace();
+  });
+
+  previewNextBtn.addEventListener('click', function () {
+    if (previewPageIndex >= previewPageCount - 1) return;
+    previewPageIndex++;
+    previewPageNav.dataset.userNav = '1';
+    lastLoadedPreviewKey = '';
+    updatePageNav();
+    loadPreviewImage();
+    saveWorkspace();
+  });
+
+  resetLayersBtn.addEventListener('click', resetLayerToggles);
+
+  document.querySelectorAll('.layer-controls input[type=checkbox]').forEach(function (cb) {
+    cb.addEventListener('change', function (e) {
+      var type = e.target.id.replace('toggle-', '');
+      layerVisibility[type] = e.target.checked;
+      redrawHighlights();
+    });
+    saveWorkspace();
+  });
+
+  vizImage.addEventListener('load', redrawHighlights);
+  window.addEventListener('resize', redrawHighlights);
+
+  function renderImportedTable(files, skipAutoPreview) {
+    importedFiles = files.map(function (f) {
+      return { relativePath: f.relativePath, fileName: f.fileName || f.relativePath };
+    });
+    importTableBody.innerHTML = '';
+
+    for (var i = 0; i < importedFiles.length; i++) {
+      var f = importedFiles[i];
+      var tr = document.createElement('tr');
+      tr.setAttribute('data-path', f.relativePath);
+
+      var tdNo = document.createElement('td');
+      tdNo.className = 'col-no';
+      tdNo.textContent = String(i + 1);
+
+      var tdName = document.createElement('td');
+      tdName.className = 'col-name';
+      tdName.textContent = f.fileName;
+      tdName.title = f.fileName;
+
+      var tdPreview = document.createElement('td');
+      tdPreview.className = 'col-preview';
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn-preview-eye';
+      btn.title = 'Preview ' + f.fileName;
+      btn.setAttribute('aria-label', 'Preview ' + f.fileName);
+      btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+      (function (rel, name) {
+        btn.addEventListener('click', function () { showStaticPreview(rel, name); });
+      })(f.relativePath, f.fileName);
+      tdPreview.appendChild(btn);
+
+      tr.appendChild(tdNo);
+      tr.appendChild(tdName);
+      tr.appendChild(tdPreview);
+      importTableBody.appendChild(tr);
+    }
+
+    importTableWrap.classList.toggle('hidden', importedFiles.length === 0);
+    setExtractEnabled(importedFiles.length > 0);
+
+    if (importedFiles.length === 1 && !skipAutoPreview) {
+      showStaticPreview(importedFiles[0].relativePath, importedFiles[0].fileName);
+    } else {
+      saveWorkspace();
+    }
+  }
+
+  function statusLabel(status) {
+    var names = ['Pending', 'Running', 'Completed', 'Failed'];
+    if (typeof status === 'string') return status;
+    return names[status] ?? String(status);
+  }
+
+  function isTerminal(status) {
+    return status === 2 || status === 3 || status === 'Completed' || status === 'Failed';
+  }
+
+  async function pollStatus(jobId) {
+    var res = await fetch('/api/extraction/status/' + jobId);
+    if (!res.ok) {
+      appendLog('Could not read job status (HTTP ' + res.status + ')', 'log-error');
+      return null;
+    }
+    return await res.json();
+  }
+
+  function stopPolling() {
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+    stopVisualizerPolling();
+    stopElapsedClock();
+  }
+
+  importBtn.addEventListener('click', function () {
+    pdfPicker.click();
+  });
+
+  pdfPicker.addEventListener('change', async function () {
+    var selected = Array.from(pdfPicker.files || []);
+    if (selected.length === 0)
+      return;
+
+    stopPolling();
+    banners.innerHTML = '';
+    progressEl.style.width = '0%';
+    clearImportUi(false);
+    logEl.innerHTML = '';
+    clearPreviewPanel();
+
+    importBtn.textContent = 'Uploading…';
+    appendLog('Uploading ' + selected.length + ' PDF file(s)…');
+
+    var formData = new FormData();
+    for (var i = 0; i < selected.length; i++) {
+      formData.append('files', selected[i]);
+    }
+
+    try {
+      await window.waitForDataReset();
+      var res = await fetch('/api/files/import', {
+        method: 'POST',
+        body: formData
+      });
+
+      var body = {};
+      try { body = await res.json(); } catch { /* non-json */ }
+
+      if (!res.ok) {
+        appendLog(body.error || ('Import failed (HTTP ' + res.status + ')'), 'log-error');
+        return;
+      }
+
+      importFolderPath = body.folderPath || '';
+      var files = body.files || [];
+      if (files.length === 0) {
+        appendLog('No PDF files were imported.', 'log-warn');
+        return;
+      }
+
+      renderImportedTable(files);
+      appendLog('Imported ' + files.length + ' PDF(s). Preview with the eye icon, then click Extract Tooling Data.');
+      saveWorkspace();
+    } catch (err) {
+      appendLog('Import error: ' + err.message, 'log-error');
+    } finally {
+      pdfPicker.value = '';
+      importBtn.textContent = 'Import Files';
+    }
+  });
+
+  startBtn.addEventListener('click', async function () {
+    if (!importFolderPath || importedFiles.length === 0) {
+      appendLog('Import files first.', 'log-error');
+      return;
+    }
+
+    var relativePaths = importedFiles.map(function (f) { return f.relativePath; });
+
+    stopPolling();
+    banners.innerHTML = '';
+    progressEl.style.width = '0%';
+
+    setExtractBusy(true);
+    startElapsedClock();
+    appendLog('Starting extraction for ' + relativePaths.length + ' imported PDF(s) (replacing any existing rows)…');
+
+    try {
+      var res = await fetch('/api/extraction/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({
+          folderPath: importFolderPath,
+          filePaths: relativePaths
+        })
+      });
+
+      var body = {};
+      try { body = await res.json(); } catch { /* non-json */ }
+
+      if (!res.ok) {
+        appendLog(body.error || ('Request failed (HTTP ' + res.status + ')'), 'log-error');
+        setExtractBusy(false);
+        stopElapsedClock();
+        return;
+      }
+
+      var jobId = body.jobId;
+      if (!jobId) {
+        appendLog('Server did not return a job id.', 'log-error');
+        setExtractBusy(false);
+        stopElapsedClock();
+        return;
+      }
+
+      appendLog('Job #' + jobId + ' queued. Processing PDFs (OCR may take several minutes per file)…');
+      startVisualizerPolling(jobId);
+      saveWorkspace();
+      var statusDiv = document.createElement('div');
+      statusDiv.id = 'statusLine';
+      statusDiv.className = 'text-accent mt-2';
+      logEl.appendChild(statusDiv);
+
+      pollTimer = setInterval(async function () {
+        try {
+          var st = await pollStatus(jobId);
+          if (!st) return;
+
+          var total = Math.max(st.totalFiles || 0, 1);
+          var done = (st.processedFiles || 0) + (st.skippedFiles || 0) + (st.failedFiles || 0);
+          var pct = st.totalFiles > 0 ? Math.min(100, Math.round((done / total) * 100)) : (st.status === 1 ? 5 : 0);
+          progressEl.style.width = pct + '%';
+          saveWorkspace();
+
+          var statusLine = document.getElementById('statusLine');
+          if (statusLine && (st.status === 0 || st.status === 1 || st.status === 'Pending' || st.status === 'Running')) {
+            statusLine.textContent = 'Status: ' + statusLabel(st.status) + ' — ' + done + '/' + st.totalFiles +
+              ' files (processed ' + st.processedFiles + ', skipped ' + st.skippedFiles + ', failed ' + st.failedFiles + ')';
+          }
+
+          if (isTerminal(st.status)) {
+            clearInterval(pollTimer);
+            pollTimer = null;
+            stopVisualizerPolling();
+            stopElapsedClock();
+            progressEl.style.width = '100%';
+            setExtractBusy(false);
+
+            pollVisualizer(jobId);
+            saveWorkspace();
+
+            if (st.status === 3 || st.status === 'Failed') {
+              appendLog('Extraction failed: ' + (st.errorSummary || 'Unknown error'), 'log-error');
+              return;
+            }
+
+            if (st.totalFiles === 0) {
+              appendLog('No PDF files were processed.', 'log-warn');
+              return;
+            }
+
+            appendLog('Done: ' + st.processedFiles + ' processed, ' + st.skippedFiles + ' skipped, ' +
+              st.failedFiles + ' failed, ' + st.amendedFilesDetected + ' amended.');
+
+            if (st.failedFiles > 0) {
+              appendLog(
+                'Failed file(s): text did not match tooling templates A/B/C, or processing timed out. ' +
+                'See failed_extractions/*.txt next to the app (raw OCR text + reason).',
+                'log-warn');
+            }
+
+            if (st.processedFiles > 0) {
+              banners.innerHTML =
+                '<div class="banner-success">' +
+                'Extraction complete — <a class="underline" href="/FilesProcessed">View Files Processed</a> ' +
+                'or <a class="underline" href="/ExportAll">Export All</a>.</div>';
+            }
+
+            if (st.amendedFilesDetected > 0) {
+              banners.innerHTML += '<div class="banner-amber mt-2">⚠ ' + st.amendedFilesDetected +
+                ' file(s) were PDF-amended — check the Review Required sheet in the Excel export.</div>';
+            }
+            saveWorkspace();
+          }
+        } catch (err) {
+          stopPolling();
+          setExtractBusy(false);
+          appendLog('Polling error: ' + err.message, 'log-error');
+        }
+      }, 2000);
+
+      await pollStatus(jobId);
+    } catch (err) {
+      appendLog('Error: ' + err.message, 'log-error');
+      setExtractBusy(false);
+      stopElapsedClock();
+    }
+  });
+
+  window.addEventListener('pagehide', function () {
+    if (importedFiles.length === 0 && !importFolderPath) return;
+    saveWorkspace();
+  });
+  window.addEventListener('pageshow', function (e) {
+    if (e.persisted) restoreWorkspace();
+  });
+  window.teSaveWorkspace = saveWorkspace;
+  restoreWorkspace();
+})();
+</script>
+}
+

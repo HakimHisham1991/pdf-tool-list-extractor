@@ -1,0 +1,229 @@
+**Task: Add Multi-Layer Visual Highlighting on PDF Preview**
+
+### Goal
+After OCR, table detection, and data extraction are complete, enhance the PDF preview with **multiple colored highlight layers**:
+
+| Layer                    | Color  | Opacity | Source                          |
+|--------------------------|--------|---------|---------------------------------|
+| OCR text regions         | Blue   | 50%     | PaddleOCR text boxes            |
+| Table borders detected   | Gray   | 30%     | Table detector (pdfplumber etc.)|
+| Extracted tool data      | Green  | 50%     | Rows successfully matched to schema |
+| Low confidence OCR       | Red    | 50%     | OCR boxes with confidence below threshold (e.g. &lt; 0.7) |
+| Ignored content          | Yellow | 20%     | Headers, footers, logos, watermarks etc. |
+
+Use a canvas overlay on top of the existing JPEG preview for smooth, performant rendering.
+
+### Current Project Context
+- ASP.NET Core Razor Pages app
+- PDF preview uses `PDFtoImage` + PDFium (JPEG output)
+- Existing Visualizer API: `/api/extraction/{jobId}/visualizer`
+
+### Requirements
+
+1. **Backend Changes**
+   - Store all highlight types per page with normalized coordinates (0–1)
+   - Categorize boxes by type for different rendering
+   - Extend the visualizer endpoint to return all layers
+
+2. **Frontend Changes**
+   - Canvas overlay with independent toggles for each layer
+   - Proper opacity and stroke for each category
+
+### Step-by-Step Implementation
+
+#### 1. Update Models
+
+```csharp
+// Models/ExtractionHighlights.cs
+public class ExtractionHighlights
+{
+    public int PageNumber { get; set; }
+    public List<HighlightBox> Boxes { get; set; } = new();
+}
+
+public class HighlightBox
+{
+    public float X { get; set; }        // normalized 0-1
+    public float Y { get; set; }
+    public float Width { get; set; }
+    public float Height { get; set; }
+    public string Type { get; set; }    // "ocr", "table", "extracted", "lowconf", "ignored"
+    public float Confidence { get; set; }
+}
+```
+
+#### 2. Modify Extraction Service
+
+In your extraction pipeline (e.g. `ExtractionService.cs` or Python interop layer):
+
+- After **PaddleOCR**: Separate normal text boxes and low-confidence boxes
+- After **Table Detection**: Add table cell/border boxes
+- After **Schema Matching**: Mark successfully extracted rows as "extracted"
+- Detect ignored regions (headers/footers/logos) via layout analysis or rule-based filtering
+
+Example code snippet:
+
+```csharp
+// After OCR
+foreach (var box in ocrResult.Boxes)
+{
+    var type = box.Confidence < 0.7f ? "lowconf" : "ocr";
+    highlights.Boxes.Add(new HighlightBox
+    {
+        X = box.X / pageWidth,
+        Y = box.Y / pageHeight,
+        Width = box.Width / pageWidth,
+        Height = box.Height / pageHeight,
+        Type = type,
+        Confidence = box.Confidence
+    });
+}
+
+// Table borders
+foreach (var cell in table.Cells)
+{
+    highlights.Boxes.Add(new HighlightBox { ..., Type = "table" });
+}
+
+// Extracted tool data (matched rows)
+foreach (var matchedRow in matchedData)
+{
+    highlights.Boxes.Add(new HighlightBox { ..., Type = "extracted" });
+}
+
+// Ignored content
+foreach (var region in ignoredRegions)
+{
+    highlights.Boxes.Add(new HighlightBox { ..., Type = "ignored" });
+}
+```
+
+#### 3. Update API Endpoint
+
+```csharp
+[HttpGet("visualizer/highlights")]
+public async Task<IActionResult> GetHighlights(string jobId, int page = 1)
+{
+    var highlights = await _highlightsService.GetForPageAsync(jobId, page);
+    return Ok(highlights);
+}
+```
+
+#### 4. Frontend - Extract.cshtml (or Preview Page)
+
+```html
+<div class="pdf-preview-wrapper" style="position: relative; display: inline-block;">
+    <img id="pdfImage" src="" alt="PDF Preview" style="max-width: 100%; height: auto;" />
+    <canvas id="highlightCanvas" 
+            style="position: absolute; top: 0; left: 0; pointer-events: none;">
+    </canvas>
+</div>
+
+<div class="layer-controls mt-3 p-3 border rounded">
+    <h6>Highlight Layers</h6>
+    <label><input type="checkbox" id="toggle-ocr" checked> <span style="color:#0066ff">Blue</span> OCR Text (50%)</label><br>
+    <label><input type="checkbox" id="toggle-table" checked> <span style="color:#666666">Gray</span> Table Borders (30%)</label><br>
+    <label><input type="checkbox" id="toggle-extracted" checked> <span style="color:#00cc00">Green</span> Extracted Tool Data (50%)</label><br>
+    <label><input type="checkbox" id="toggle-lowconf" checked> <span style="color:#ff0000">Red</span> Low Confidence OCR (50%)</label><br>
+    <label><input type="checkbox" id="toggle-ignored" checked> <span style="color:#ffcc00">Yellow</span> Ignored Content (20%)</label>
+</div>
+```
+
+#### 5. JavaScript Implementation
+
+```js
+let currentHighlights = null;
+
+const layerVisibility = {
+    ocr: true,
+    table: true,
+    extracted: true,
+    lowconf: true,
+    ignored: true
+};
+
+async function loadHighlights(jobId, page) {
+    const res = await fetch(`/api/extraction/${jobId}/visualizer/highlights?page=${page}`);
+    currentHighlights = await res.json();
+    redrawHighlights();
+}
+
+function redrawHighlights() {
+    const img = document.getElementById('pdfImage');
+    const canvas = document.getElementById('highlightCanvas');
+    
+    canvas.width = img.clientWidth;
+    canvas.height = img.clientHeight;
+    
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const scaleX = canvas.width;
+    const scaleY = canvas.height;
+
+    currentHighlights?.boxes?.forEach(box => {
+        if (!layerVisibility[box.type]) return;
+
+        const x = box.x * scaleX;
+        const y = box.y * scaleY;
+        const w = box.width * scaleX;
+        const h = box.height * scaleY;
+
+        let fillStyle = 'rgba(0,0,0,0)';
+        let strokeStyle = 'rgba(0,0,0,0.6)';
+
+        switch (box.type) {
+            case 'ocr':
+                fillStyle = 'rgba(0, 100, 255, 0.5)';      // Blue 50%
+                strokeStyle = 'rgba(0, 80, 200, 0.8)';
+                break;
+            case 'table':
+                fillStyle = 'rgba(100, 100, 100, 0.3)';    // Gray 30%
+                strokeStyle = 'rgba(70, 70, 70, 0.7)';
+                break;
+            case 'extracted':
+                fillStyle = 'rgba(0, 200, 100, 0.5)';      // Green 50%
+                strokeStyle = 'rgba(0, 160, 80, 0.9)';
+                break;
+            case 'lowconf':
+                fillStyle = 'rgba(255, 60, 60, 0.5)';      // Red 50%
+                strokeStyle = 'rgba(200, 30, 30, 0.8)';
+                break;
+            case 'ignored':
+                fillStyle = 'rgba(255, 220, 60, 0.2)';     // Yellow 20%
+                strokeStyle = 'rgba(230, 180, 30, 0.5)';
+                break;
+        }
+
+        ctx.fillStyle = fillStyle;
+        ctx.strokeStyle = strokeStyle;
+        ctx.lineWidth = 1.5;
+
+        ctx.fillRect(x, y, w, h);
+        ctx.strokeRect(x, y, w, h);
+    });
+}
+
+// Attach toggle listeners
+document.querySelectorAll('.layer-controls input').forEach(cb => {
+    cb.addEventListener('change', (e) => {
+        const type = e.target.id.replace('toggle-', '');
+        layerVisibility[type] = e.target.checked;
+        redrawHighlights();
+    });
+});
+
+// Redraw on image load and resize
+document.getElementById('pdfImage').onload = redrawHighlights;
+window.addEventListener('resize', redrawHighlights);
+```
+
+#### 6. Additional Recommendations
+
+- Add tooltips on hover showing confidence / extracted value (optional advanced)
+- Store highlights efficiently (JSON column or separate table)
+- Consider performance if a page has > 1000 boxes (group small boxes if needed)
+- Add a "Reset View" button
+
+**Cursor Agent Prompt:**
+> Implement the multi-layer PDF highlight feature exactly as described in the markdown below. Follow existing code patterns and architecture.

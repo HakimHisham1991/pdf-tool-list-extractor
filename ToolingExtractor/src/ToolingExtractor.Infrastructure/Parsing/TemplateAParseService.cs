@@ -63,6 +63,7 @@ public class TemplateAParseService
                     _visualizer?.SetStage(
                         jid, "table", $"Python {python.Method}: {fromPython.Records.Count} tool rows",
                         0, 0, 0, 0);
+                    PublishPythonHighlights(jid, python);
                 }
                 return fromPython;
             }
@@ -136,5 +137,30 @@ public class TemplateAParseService
     {
         var tag = $"[TABLE:{method};raw={raw.Count}]";
         return string.IsNullOrWhiteSpace(remarks) ? tag : $"{remarks.Trim()} {tag}";
+    }
+
+    private void PublishPythonHighlights(int jobId, PythonTableExtractionPayload python)
+    {
+        if (_visualizer == null || python.Highlights.Count == 0)
+            return;
+
+        foreach (var page in python.Highlights)
+        {
+            if (page.Boxes.Count == 0)
+                continue;
+
+            var boxes = page.Boxes.Select(b => new HighlightBox
+            {
+                X = b.X,
+                Y = b.Y,
+                Width = b.Width,
+                Height = b.Height,
+                Type = string.IsNullOrWhiteSpace(b.Type) ? "table" : b.Type,
+                Confidence = b.Confidence,
+                Label = b.Label
+            }).ToList();
+
+            _visualizer.AddPageHighlights(jobId, page.PageNumber, boxes);
+        }
     }
 }

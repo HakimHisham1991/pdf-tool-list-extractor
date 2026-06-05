@@ -4,8 +4,8 @@
     ViewData["Title"] = "Files Processed";
 }
 
-<h2 class="text-2xl font-semibold mb-2 text-[#00D4FF]">Files Processed</h2>
-<p class="text-sm text-gray-400 mb-4">One row per PDF. Click a tool list ID to view extracted tooling rows.</p>
+<h2 class="page-title mb-2">Files Processed</h2>
+<p class="text-sm text-muted mb-4">One row per PDF. Click a tool list ID to view extracted tooling rows.</p>
 
 <div class="flex flex-wrap gap-2 mb-4">
     <input id="partNumber" class="input" placeholder="Part" />
@@ -28,20 +28,20 @@
         <tbody></tbody>
     </table>
 </div>
-<p id="emptyMsg" class="text-gray-400 text-sm mt-4 hidden">No processed files yet. Run Extract first.</p>
+<p id="emptyMsg" class="text-muted text-sm mt-4 hidden">No processed files yet. Run Extract first.</p>
 
 <div id="editModal" class="modal hidden">
     <div class="modal-panel">
-        <h3 class="text-lg text-[#00D4FF] mb-3">Edit file metadata</h3>
-        <p id="editFileName" class="text-xs text-gray-400 mb-3"></p>
+        <h3 class="text-lg text-accent mb-3">Edit file metadata</h3>
+        <p id="editFileName" class="text-xs text-muted mb-3"></p>
         <input type="hidden" id="editHash" />
-        <label class="block text-xs text-gray-400 mb-1">Tool List ID</label>
+        <label class="block text-xs text-muted mb-1">Tool List ID</label>
         <input id="editToolListId" class="input w-full mb-2" />
-        <label class="block text-xs text-gray-400 mb-1">Part</label>
+        <label class="block text-xs text-muted mb-1">Part</label>
         <input id="editPart" class="input w-full mb-2" />
-        <label class="block text-xs text-gray-400 mb-1">Operation</label>
+        <label class="block text-xs text-muted mb-1">Operation</label>
         <input id="editOp" class="input w-full mb-2" />
-        <label class="block text-xs text-gray-400 mb-1">Revision</label>
+        <label class="block text-xs text-muted mb-1">Revision</label>
         <input id="editRev" class="input w-full mb-4" />
         <div class="flex gap-2 justify-end">
             <button type="button" class="btn" id="editCancel">Cancel</button>
@@ -94,7 +94,7 @@
         '<td>' + esc(f.revision) + '</td>' +
         '<td class="actions-cell">' +
           '<button type="button" class="btn-link edit-btn" data-hash="' + esc(f.sourceFileHash) + '">Edit</button>' +
-          '<span class="text-gray-600"> | </span>' +
+          '<span class="text-secondary"> | </span>' +
           '<button type="button" class="btn-link btn-link-danger delete-btn" data-hash="' + esc(f.sourceFileHash) + '" data-name="' + esc(f.sourceFile) + '">Delete</button>' +
         '</td>';
       tr.querySelector('.edit-btn').addEventListener('click', () => openEdit(f));

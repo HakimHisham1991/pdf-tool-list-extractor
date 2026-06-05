@@ -173,6 +173,24 @@ public class PythonTableExtractionPayload
     public List<PythonToolTableRow> Raw { get; set; } = new();
     public List<PythonToolTableRow> Cleaned { get; set; } = new();
     public PythonValidationMeta? Validation { get; set; }
+    public List<PythonPageHighlights> Highlights { get; set; } = new();
+}
+
+public class PythonPageHighlights
+{
+    public int PageNumber { get; set; }
+    public List<PythonHighlightBox> Boxes { get; set; } = new();
+}
+
+public class PythonHighlightBox
+{
+    public float X { get; set; }
+    public float Y { get; set; }
+    public float Width { get; set; }
+    public float Height { get; set; }
+    public string Type { get; set; } = string.Empty;
+    public float Confidence { get; set; }
+    public string Label { get; set; } = string.Empty;
 }
 
 public class PythonValidationMeta

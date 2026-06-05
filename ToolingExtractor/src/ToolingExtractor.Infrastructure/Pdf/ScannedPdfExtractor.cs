@@ -104,7 +104,8 @@ public class ScannedPdfExtractor : IPdfTextExtractor
 
                     using var mat = SkiaOpenCvHelper.ToMat(working);
                     var result = _ocr.Run(mat);
-                    var filtered = result.Regions
+                    var allRegions = result.Regions.ToList();
+                    var filtered = allRegions
                         .Where(r => r.Score >= _options.OcrConfidenceThreshold)
                         .ToList();
 
@@ -116,8 +117,8 @@ public class ScannedPdfExtractor : IPdfTextExtractor
                             _logger.LogWarning("Low OCR confidence {Conf:F2} on page {Page} of {File}", minConf, pageNumber, filePath);
                     }
 
-                    if (jobId.HasValue && filtered.Count > 0)
-                        PublishOcrHighlights(jobId.Value, filtered, working.Width, working.Height, pageIndex, pageCount);
+                    if (jobId.HasValue && allRegions.Count > 0)
+                        PublishOcrHighlights(jobId.Value, allRegions, working.Width, working.Height, pageIndex, pageCount);
 
                     pageTexts.Add(OcrTableSorter.SortRegionsToTableText(filtered, working.Height));
                 }
@@ -149,19 +150,51 @@ public class ScannedPdfExtractor : IPdfTextExtractor
         int pageIndex,
         int pageCount)
     {
-        var highlights = new List<VisualizerHighlight>();
-        var max = Math.Min(regions.Count, 100);
+        var boxes = new List<HighlightBox>();
+        VisualizerHighlightHelper.AddIgnoredBands(boxes);
+
+        var max = Math.Min(regions.Count, 800);
         for (var i = 0; i < max; i++)
         {
             var r = regions[i];
             var (x, y, w, h) = RegionBounds(r.Rect);
-            highlights.Add(VisualizerHighlightHelper.FromPixelRect(
-                x, y, w, h, imageWidth, imageHeight, r.Text, "ocr"));
+            var type = r.Score < VisualizerHighlightHelper.LowConfidenceThreshold ? "lowconf" : "ocr";
+            boxes.Add(VisualizerHighlightHelper.HighlightFromPixelRect(
+                x, y, w, h, imageWidth, imageHeight, r.Text, type, r.Score));
         }
 
+        AddTableRegionHighlights(boxes, regions, imageWidth, imageHeight);
+
+        _visualizer?.AddPageHighlights(jobId, pageIndex + 1, boxes);
         _visualizer?.SetStage(
-            jobId, "ocr", $"OCR — highlighting {highlights.Count} region(s) on page {pageIndex + 1}",
-            pageIndex, pageCount, imageWidth, imageHeight, highlights, 0);
+            jobId, "ocr", $"OCR — {boxes.Count} highlight region(s) on page {pageIndex + 1}",
+            pageIndex, pageCount, imageWidth, imageHeight, null, 0);
+    }
+
+    private static void AddTableRegionHighlights(
+        List<HighlightBox> boxes,
+        IReadOnlyList<PaddleOcrResultRegion> regions,
+        int imageWidth,
+        int imageHeight)
+    {
+        var toolRegions = regions
+            .Where(r => System.Text.RegularExpressions.Regex.IsMatch(r.Text, @"\bT\d{2}\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+            .Take(200)
+            .ToList();
+        if (toolRegions.Count < 3)
+            return;
+
+        var bounds = toolRegions.Select(r => RegionBounds(r.Rect)).ToList();
+        var minX = bounds.Min(b => b.X);
+        var minY = bounds.Min(b => b.Y);
+        var maxX = bounds.Max(b => b.X + b.W);
+        var maxY = bounds.Max(b => b.Y + b.H);
+        var padX = (maxX - minX) * 0.02;
+        var padY = (maxY - minY) * 0.03;
+        boxes.Add(VisualizerHighlightHelper.HighlightFromPixelRect(
+            minX - padX, minY - padY - 40,
+            maxX - minX + padX * 2, maxY - minY + padY * 2 + 40,
+            imageWidth, imageHeight, "tool table", "table"));
     }
 
     private static (double X, double Y, double W, double H) RegionBounds(RotatedRect rect)

@@ -9,6 +9,7 @@ import pandas as pd
 from .camelot_extract import extract_with_camelot
 from .clean import clean_dataframe, rows_to_dataframe
 from .columns import CANONICAL_COLUMNS, map_headers
+from .highlights import extract_page_highlights
 from .pdfplumber_extract import extract_with_pdfplumber
 from .pdfplumber_wordgrid import extract_with_wordgrid
 from .tabula_extract import extract_with_tabula
@@ -44,6 +45,14 @@ def _build_frames(
     }
 
 
+def _attach_highlights(result: dict[str, Any], pdf_path: str) -> dict[str, Any]:
+    try:
+        result["highlights"] = extract_page_highlights(pdf_path)
+    except Exception:
+        result["highlights"] = []
+    return result
+
+
 def extract_tooling_table(pdf_path: str) -> dict[str, Any]:
     errors: list[str] = []
     strategy_order = ["pdfplumber-wordgrid", "pdfplumber", "camelot", "tabula"]
@@ -52,28 +61,28 @@ def extract_tooling_table(pdf_path: str) -> dict[str, Any]:
     result = _build_frames(header, body, method)
     if result:
         result["strategy_order"] = strategy_order
-        return result
+        return _attach_highlights(result, pdf_path)
     errors.append(method)
 
     header, body, method = extract_with_pdfplumber(pdf_path)
     result = _build_frames(header, body, method)
     if result:
         result["strategy_order"] = strategy_order
-        return result
+        return _attach_highlights(result, pdf_path)
     errors.append(method)
 
     header, body, method = extract_with_camelot(pdf_path)
     result = _build_frames(header, body, method)
     if result:
         result["strategy_order"] = strategy_order
-        return result
+        return _attach_highlights(result, pdf_path)
     errors.append(method)
 
     header, body, method = extract_with_tabula(pdf_path)
     result = _build_frames(header, body, method)
     if result:
         result["strategy_order"] = strategy_order
-        return result
+        return _attach_highlights(result, pdf_path)
     errors.append(method)
 
     return {

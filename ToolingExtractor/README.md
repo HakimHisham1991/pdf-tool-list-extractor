@@ -1,4 +1,4 @@
-# ToolingExtractor v3.6.1
+# ToolingExtractor v3.8.1
 
 Production-oriented **aerospace CNC tooling PDF extraction** — **.NET 10** web app plus an optional **Python** bordered-table engine for Master Tooling List PDFs. It reads Work Instruction / tooling list PDFs, extracts structured tool rows, stores them in **SQLite**, and exposes a **Razor Pages** web UI plus JSON/CSV/Excel export APIs.
 
@@ -200,9 +200,8 @@ Summary counts: total records, digital vs scanned, amended PDFs, revision confli
 | Control | Action |
 |---------|--------|
 | **Import Files** | Opens the OS file picker. Uploaded PDFs appear in a table (No., Filename, **eye icon**). |
-| **Eye icon (preview)** | Loads a **full-page** JPEG in the right panel (text, borders, and graphics via PDFium). Multi-page PDFs: use ‹ › under the filename. |
+| **Eye icon (preview)** | Loads a **full-page** JPEG below the import table (text, borders, and graphics via PDFium). Multi-page PDFs: use ‹ › under the filename. |
 | **Extract Tooling Data** | Enabled after import. Progress bar, log, and elapsed timer (`HH:MM:SS`). **Always re-extracts** matching file hashes. |
-| **Clear All** | Wipes SQLite, upload staging, `failed_extractions`, and `amended_pdf_log`. Starts a fresh session. |
 
 **Import tips**
 
@@ -228,13 +227,14 @@ Downloads **all** tooling records in the current database as CSV or Excel. Legac
 
 | Event | What gets cleared |
 |--------|-------------------|
-| **Browser reload (F5)** or **first visit in a new tab** | SQLite DB recreated (migrate), `failed_extractions`, `amended_pdf_log`, `data/uploads` |
-| **Clear All** on Extract | Same as above, without leaving the page |
-| **Navigate between pages** (same tab, no F5) | Data **kept** until reload or Clear All |
+| **Browser reload (F5 / hard refresh)** | SQLite DB recreated (migrate), `failed_extractions`, `amended_pdf_log`, `data/uploads`, Extract workspace |
+| **New tab or window** (first open) | Same as reload |
+| **Close tab or window** | Session cookie expires; next open is treated as a new tab (full reset) |
+| **Navigate between pages** (Extract ↔ Files Processed ↔ Tool List Data, same tab) | Data **kept** — server session cookie preserves DB rows and Extract workspace |
 
-The layout calls `POST /api/data/reset` on reload/new tab. Pages that load API data wait on `waitForDataReset()` so they do not read stale data mid-reset.
+On each **HTML page** request, middleware ensures a session cookie exists and resets only when the cookie is missing (new tab/window). **API requests never reset data** (fixes accidental wipes from background save calls). F5 reload calls `POST /api/session/reload`. Extract saves workspace to sessionStorage and the server when you navigate away.
 
-**Implication** — Finish extraction and export before pressing F5, or you will lose in-memory session results until you import and extract again.
+**Implication** — Finish extraction and export before pressing F5 or closing the tab, or you will need to import and extract again.
 
 ---
 
@@ -345,6 +345,7 @@ Base URL: same origin as the web app (e.g. `http://localhost:5261`).
 | `POST` | `/api/extraction/start` | JSON `{ folderPath, filePaths[] }`. `folderPath` from import response; `filePaths` relative names. Always re-extracts. Returns `{ jobId }`. |
 | `GET` | `/api/extraction/status/{jobId}` | Job progress and counts. |
 | `GET` | `/api/extraction/{jobId}/visualizer` | Live snapshot: file name, stage, page index, normalized highlight rectangles (`x`,`y`,`w`,`h` 0–1). |
+| `GET` | `/api/extraction/{jobId}/visualizer/highlights?page=N` | Multi-layer highlight boxes per page (`ocr`, `table`, `extracted`, `lowconf`, `ignored`) with normalized coordinates. |
 | `GET` | `/api/extraction/{jobId}/visualizer/preview?page=N` | JPEG render of the current PDF page for the active file. |
 
 ### Files and records
@@ -369,7 +370,10 @@ Base URL: same origin as the web app (e.g. `http://localhost:5261`).
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/api/dashboard` | Aggregate stats for Dashboard page. |
-| `POST` | `/api/data/reset` | Delete DB, migrate, clear log/upload folders. |
+| `POST` | `/api/session/reload` | Reset DB on browser reload (F5). |
+| `GET` | `/api/session/workspace` | Returns saved Extract page workspace for the current browser session. |
+| `POST` | `/api/session/workspace` | Saves Extract page workspace JSON for the current browser session. |
+| `POST` | `/api/data/reset` | Manual delete DB, migrate, clear log/upload folders (legacy; prefer session ensure). |
 
 ---
 

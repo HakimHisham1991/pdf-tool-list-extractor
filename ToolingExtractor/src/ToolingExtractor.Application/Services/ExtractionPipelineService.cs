@@ -198,6 +198,12 @@ public class ExtractionPipelineService
                     job.Id, "done", $"Extracted {result.Records.Count} tool row(s)",
                     0, 0, 0, 0);
 
+                var toolNumbers = result.Records
+                    .Select(r => r.ToolNo)
+                    .Where(t => !string.IsNullOrWhiteSpace(t))
+                    .ToList();
+                _visualizer.MarkExtractedHighlights(job.Id, toolNumbers);
+
                 foreach (var record in result.Records)
                 {
                     record.ExtractionJobId = job.Id;
@@ -243,7 +249,6 @@ public class ExtractionPipelineService
         });
 
         await Task.WhenAll(tasks);
-        _visualizer.ClearJob(job.Id);
         await progressCts.CancelAsync();
         try { await progressReporter; } catch (OperationCanceledException) { }
 

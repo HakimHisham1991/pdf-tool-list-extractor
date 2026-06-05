@@ -1,5 +1,84 @@
 # Changelog
 
+## [3.8.1] - 2026-06-05
+
+### Fixed
+
+- **Extract page — Import Files always active** — Import Files no longer uses grey secondary styling or gets disabled during upload/extraction; only Extract Tooling Data is disabled while a job runs.
+
+## [3.8.0] - 2026-06-05
+
+### Changed
+
+- **UI color theme** — Replaced the dark cyan/navy palette with a light theme aligned to the PDC Database palette: off-white background (`#FBFBFB`), primary blue (`#2453B3`), muted blue-grey secondary (`#9BA9B8`), and neutral greys for text and borders. Sidebar, buttons, cards, tables, progress bar, and log styling updated via shared CSS variables in `app.css`.
+
+## [3.7.5] - 2026-06-05
+
+### Fixed
+
+- **Critical: DB wiped on navigation** — `sendBeacon`/API calls without session cookies triggered middleware that reset the database. API routes no longer auto-reset; only HTML page loads (new tab) or F5 reload reset data.
+- Extract workspace restores from **sessionStorage first**, then server file fallback.
+- Tab id header (`X-Te-Tab-Id`) keys workspace when saving during page leave without cookies.
+- Sidebar navigation from Extract saves workspace before leaving the page.
+
+## [3.7.4] - 2026-06-05
+
+### Fixed
+
+- **Session data lost on navigation** — Root cause was an async `/api/session/ensure` race: navigating before the session cookie was set triggered a full DB reset on the next page.
+- Session cookie is now set synchronously via **middleware** on the first HTML/API request (no reset on later navigation).
+- Extract workspace persisted to **disk** (`data/session-workspaces/`) instead of in-memory only.
+- Workspace save on page leave uses `sendBeacon` for reliable delivery when clicking away.
+
+### Changed
+
+- Reset on F5 only via `POST /api/session/reload`; removed per-page `/api/session/ensure` reset call.
+
+## [3.7.3] - 2026-06-05
+
+### Fixed
+
+- **Session persistence (reliable)** — Browser session is now tracked with an HttpOnly cookie on the server. DB and Extract workspace are **not** reset when navigating between Extract, Files Processed, and Tool List Data.
+- Reset runs only when the session cookie is missing (new tab/window after close) or on F5 reload.
+- Extract workspace saved to server (`PUT /api/session/workspace`) in addition to `sessionStorage`.
+
+## [3.7.2] - 2026-06-05
+
+### Fixed
+
+- **Session persistence**: Import list, extraction log, preview state, and DB rows now survive navigation between Extract, Files Processed, and Tool List Data in the same tab.
+- Extract workspace is saved to `sessionStorage` and restored when returning to the Extract page.
+
+### Changed
+
+- Data reset runs only on **browser reload**, **new tab/window**, or **after closing the tab** (next visit). Navigation between app pages no longer clears data.
+- Removed **Clear All** button (reset is automatic on reload/close only).
+
+## [3.7.1] - 2026-06-05
+
+### Fixed
+
+- **PDF preview flicker** during extraction: visualizer polling no longer reloads the JPEG on every tick; image refreshes only when the page changes, and highlight overlays update when snapshot data changes.
+- Visualizer polling stops when extraction completes (was continuing indefinitely).
+
+### Changed
+
+- PDF preview panel moved below the import file table and spans the same full width as the table (single-column layout).
+
+## [3.7.0] - 2026-06-05
+
+### Added
+
+- **Multi-layer PDF highlight overlays** on the Extract preview during and after extraction: OCR text (blue), table borders (gray), extracted tool rows (green), low-confidence OCR (red), and ignored header/footer bands (yellow).
+- Canvas overlay with independent layer toggles and a **Reset View** button.
+- API: `GET /api/extraction/{jobId}/visualizer/highlights?page=N` returns normalized highlight boxes per page.
+- Python table pipeline exports page highlight metadata (pdfplumber edges, table bounds, ignored bands).
+
+### Changed
+
+- Live extraction visualizer polling restored on the Extract page with multi-layer rendering.
+- Highlight data accumulates per page in the visualizer store until the job completes (no longer cleared at pipeline end).
+
 ## [3.6.1] - 2026-06-04
 
 ### Fixed

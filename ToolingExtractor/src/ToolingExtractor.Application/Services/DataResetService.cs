@@ -6,7 +6,7 @@ using ToolingExtractor.Infrastructure.Data;
 
 namespace ToolingExtractor.Application.Services;
 
-/// <summary>Clears SQLite data and on-disk extraction logs on each full page load.</summary>
+/// <summary>Clears SQLite data and on-disk extraction logs on new browser tab or page reload.</summary>
 public class DataResetService
 {
     private readonly ToolingDbContext _db;

@@ -5,11 +5,11 @@
 }
 
 <div class="mb-4">
-    <a class="text-sm text-[#00D4FF] hover:underline" href="/FilesProcessed">&larr; Back to Files Processed</a>
+    <a class="text-sm text-accent hover:underline" href="/FilesProcessed">&larr; Back to Files Processed</a>
 </div>
 
-<h2 class="text-2xl font-semibold mb-2 text-[#00D4FF]">Tool List Data Extracted</h2>
-<div id="fileMeta" class="text-sm text-gray-400 mb-4"></div>
+<h2 class="page-title mb-2">Tool List Data Extracted</h2>
+<div id="fileMeta" class="text-sm text-muted mb-4"></div>
 <div id="exportBar" class="flex gap-2 mb-4 hidden">
     <a id="exportCsv" class="btn" href="#">Download CSV</a>
     <a id="exportExcel" class="btn" href="#">Download Excel</a>
@@ -36,7 +36,7 @@
         <tbody></tbody>
     </table>
 </div>
-<p id="loadError" class="text-red-400 text-sm mt-4 hidden"></p>
+<p id="loadError" class="log-error text-sm mt-4 hidden"></p>
 
 @section Scripts {
 <script>
@@ -72,9 +72,9 @@
     const data = await res.json();
     const s = data.summary;
     metaEl.innerHTML =
-      '<strong class="text-gray-200">' + esc(s.sourceFile) + '</strong> &mdash; ' +
+      '<strong class="text-strong">' + esc(s.sourceFile) + '</strong> &mdash; ' +
       esc(s.toolListId) + ' | Part: ' + esc(s.partNumber) + ' | Op: ' + esc(s.operation) +
-      ' | Rev: ' + esc(s.revision) + ' | <span class="text-[#00D4FF]">' + s.toolRowCount + ' tools</span>';
+      ' | Rev: ' + esc(s.revision) + ' | <span class="text-accent">' + s.toolRowCount + ' tools</span>';
 
     const hashParam = encodeURIComponent(hash);
     exportCsv.href = '/api/export/csv?hash=' + hashParam;
